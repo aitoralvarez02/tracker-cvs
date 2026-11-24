@@ -1,0 +1,18 @@
+{
+ "nombre": "Ana Prueba Núñez",
+ "cargo": "Manager de Gobierno, Riesgo & Cumplimiento",
+ "empresa": "KPMG España",
+ "foto": "",
+ "linkedin": "https://www.linkedin.com/in/ana-prueba",
+ "tendencias": "",
+ "insights": ["Más de 10 años en control interno", "Experiencia en SOx", "Sector financiero"],
+ "formacion": ["Licenciatura en ADE - Universidad Complutense", "CIA"],
+ "parrafo_azul": "Manager con experiencia en **control interno** y cumplimiento.",
+ "cuerpo": [
+  { "tipo": "parrafo", "texto": "**Principales proyectos:**" },
+  { "tipo": "lista", "items": ["2019-2022 — Banco A: revisión SOx", "2022-2024 — Aseguradora B: mapa de riesgos"] }
+ ],
+ "en": { "cargo": "Governance, Risk & Compliance Manager", "empresa": "", "insights": [], "formacion": [], "parrafo_azul": "", "cuerpo": [] },
+ "slides": { "layout": "manual", "paginas": [1, 2] },
+ "meta": { "categoria": "Manager", "oficina": "Madrid", "areas": ["Compliance"], "actualizado": "2025-01-01", "extra": "se conserva" }
+}

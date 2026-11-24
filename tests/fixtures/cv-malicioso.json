@@ -1,0 +1,12 @@
+{
+ "nombre": "<img src=x onerror=\"window.__pwned=1\">Mal Ejemplo",
+ "cargo": "Consultor",
+ "empresa": "KPMG España",
+ "foto": "http://example.invalid/foto.jpg",
+ "linkedin": "javascript:window.__pwned=3",
+ "tendencias": "https://example.invalid/articulo",
+ "insights": [],
+ "formacion": ["Grado"],
+ "parrafo_azul": "Texto con </script><script>window.__pwned=2</script> dentro",
+ "cuerpo": [{ "tipo": "parrafo", "texto": "<b onclick=\"window.__pwned=4\">x</b>" }]
+}
