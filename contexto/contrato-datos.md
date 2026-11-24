@@ -14,7 +14,7 @@ Cada CV es un HTML autocontenido. Al guardar, el CV Maker se copia a sí mismo c
 - `<title>`: `CV · <nombre> | KPMG`.
 - Dentro del JSON, cada `<` se escribe como `<`. Así ningún texto puede cerrar la etiqueta `<script>`.
 
-**Nombre de archivo estable:** `CV_` + las palabras del nombre sin tildes, con la primera letra en mayúscula y unidas por `_` + `.html`. Por ejemplo, «Ana Prueba Núñez» se guarda como `CV_Ana_Prueba_Nunez.html`.
+**Nombre de archivo estable:** `CV_` + las palabras del nombre sin tildes, con la primera letra en mayúscula y unidas por `_` + `.html`. Por ejemplo, «Ana Prueba Núñez» se guarda como `CV_Ana_Prueba_Nunez.html`. El JSON exportado y el PDF de «Imprimir / guardar en PDF» usan el mismo nombre (`nombreArchivo` en `core.js`).
 
 ## 2. El JSON
 

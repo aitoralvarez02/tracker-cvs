@@ -404,3 +404,40 @@ test('descarga: avisa de que el navegador puede añadir « (1)» y hay que susti
   await expect(page.locator('.toast--aviso')).toContainText('CV_Ana_Prueba_Nunez (1).html');
   await expect(page.locator('.toast--aviso')).toContainText('sustituye el anterior');
 });
+
+/* ---------- Render y vista ---------- */
+test('vista: la línea entre columnas termina con el texto y los botones no tapan el CV', async ({ page }) => {
+  await abrirEditor(page);
+  const cv = muestra(/Melero/);
+  await abrirJson(page, cv, 'melero.json');
+  const lienzo = page.locator('#cvbox .cv-lienzo');
+  await expect(lienzo).toHaveAttribute('data-cols', '2');
+  const m = await lienzo.evaluate(c => {
+    const l = c.querySelector('.cv-linea'), t = c.querySelector('.cv-texto'), tr = t.getBoundingClientRect(), s = tr.width / t.offsetWidth;
+    const fondo = Math.max(...[...t.querySelectorAll('.cv-p')].map(p => (p.getBoundingClientRect().bottom - tr.top) / s));
+    return { hidden: l.hidden, top: l.offsetTop, alto: l.offsetHeight, fondo, zona: c.querySelector('.cv-zona').clientHeight };
+  });
+  expect(m.hidden).toBe(false);
+  expect(m.top).toBe(-10);
+  expect(Math.abs(m.alto - (Math.ceil(m.fondo) + 20))).toBeLessThanOrEqual(1);
+  expect(m.alto).toBeLessThan(m.zona + 20);
+  // en «Ver CV», los botones flotantes quedan por debajo del lienzo (no tapan el pie)
+  const cvBox = await lienzo.boundingBox(), flot = await page.locator('#flot').boundingBox();
+  expect(flot.y).toBeGreaterThanOrEqual(cvBox.y + cvBox.height);
+  // en «Editar», el aviso de ajuste tampoco
+  await page.locator('header [data-modo="editar"]').click();
+  await expect.poll(async () => { const a = await page.locator('#ajuste').boundingBox(), c = await lienzo.boundingBox(); return a.y >= c.y + c.height; }).toBe(true);
+  // con 1 columna no hay línea
+  await abrirCV(page, FIX('cv-completo.json'));
+  await expect(page.locator('#cvbox .cv-linea')).toBeHidden();
+});
+
+test('imprimir: el PDF se propone con el mismo nombre que el HTML (CV_Nombre_Apellidos)', async ({ page }) => {
+  await page.addInitScript(() => { window.print = () => { window.__tituloPdf = document.title; }; });
+  await abrirEditor(page);
+  await abrirCV(page, FIX('cv-completo.json'));
+  await page.locator('#flot [data-acc="imprimir"]').click();
+  await expect.poll(() => page.evaluate(() => window.__tituloPdf)).toBe('CV_Ana_Prueba_Nunez');
+  const g = await guardar(page);
+  expect(g.nombre).toBe('CV_Ana_Prueba_Nunez.html');
+});

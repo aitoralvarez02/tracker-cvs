@@ -8,6 +8,8 @@
   const bold = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
   const slug = s => norm(s).replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  /* Nombre estable del archivo de un CV, sin extensión (HTML, JSON y PDF): «Ana Prueba Núñez» → CV_Ana_Prueba_Nunez. */
+  const nombreArchivo = nombre => 'CV_' + (String(nombre || '').normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^A-Za-z0-9]+/).filter(Boolean).map(p => p[0].toUpperCase() + p.slice(1)).join('_') || 'Nuevo');
   const vacio = v => v == null || v === '' || (Array.isArray(v) && v.length === 0);
   const hoy = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 
@@ -384,7 +386,7 @@
     D.body.classList.add('imprimiendo');
     const fin = () => { D.body.classList.remove('imprimiendo'); host.remove(); };
     g.addEventListener('afterprint', fin, { once: true });
-    const t = D.title; D.title = 'CV_' + (slug(data.nombre) || 'cv');
+    const t = D.title; D.title = nombreArchivo(data.nombre); // Chrome y Edge proponen el título como nombre del PDF
     setTimeout(() => { g.print(); D.title = t; }, 80);
   }
 
@@ -530,7 +532,7 @@
   const debounce = (f, ms) => { let t; return function () { clearTimeout(t); const a = arguments; t = setTimeout(() => f.apply(null, a), ms); }; };
 
   g.CVK = {
-    $, $$, esc, bold, norm, slug, vacio, hoy, SCHEMA, CAMPOS_EN, CATEGORIAS, OFICINAS, AREAS, LABELS, FOTO_GENERICA,
+    $, $$, esc, bold, norm, slug, nombreArchivo, vacio, hoy, SCHEMA, CAMPOS_EN, CATEGORIAS, OFICINAS, AREAS, LABELS, FOTO_GENERICA,
     emptyCV, normalize, clean, pick, tieneEN, urlOk, fotoOk, vacioTotal, comprobar, completitud,
     inferCategoria, inferOficina, ordenCat, derivados, mesesDesde, fechaLarga, textoCompleto,
     extraerJsonDeHtml, jsonDeTexto, leerCVs, expPiezas, firma, firmaExperiencia, firmaFormacion, generarSlides, prepararSlides, montarCV, imprimirCV, procesarFoto, IDB, descargar, guardar, abrir, leerTexto,

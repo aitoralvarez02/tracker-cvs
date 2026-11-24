@@ -216,10 +216,12 @@ textarea { resize: vertical; min-height: 84px; font-family: inherit; }
 .foto-prev img { width: 100%; height: 100%; object-fit: cover; display: block; }
 #btn-comp { gap: 9px; } .prog { display: inline-block; width: 46px; height: 6px; border-radius: 99px; background: rgba(255, 255, 255, .25); overflow: hidden; } .prog i { display: block; height: 100%; background: #4FD1CB; border-radius: 99px; transition: width .3s; }
 .vista { position: relative; min-width: 0; min-height: 0; background: var(--lienzo); display: flex; flex-direction: column; }
-.vista-caja { flex: 1; min-height: 0; overflow: hidden; }
-.ajuste { position: absolute; left: 14px; bottom: 12px; background: var(--surface); color: var(--ink2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 12px; box-shadow: var(--sombra); }
+/* El CV se escala en .vista-caja; debajo queda una franja para el aviso de ajuste y, en «Ver CV», los botones flotantes, que así no tapan el pie del CV. */
+.vista-caja { flex: 1; min-height: 0; overflow: hidden; margin-bottom: 44px; }
+#app[data-modo="ver"] .vista-caja { margin-bottom: 76px; }
+.ajuste { position: absolute; left: 14px; bottom: 10px; background: var(--surface); color: var(--ink2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 12px; box-shadow: var(--sombra); }
 .ajuste--aviso { color: var(--warn); border-color: var(--warn); } .ajuste--mal { color: #fff; background: var(--bad); border-color: var(--bad); }
-.flot { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; background: var(--surface); padding: 8px; border-radius: 14px; box-shadow: 0 14px 40px -10px rgba(11, 31, 63, .45); border: 1px solid var(--line); }
+.flot { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; background: var(--surface); padding: 8px; border-radius: 14px; box-shadow: 0 14px 40px -10px rgba(11, 31, 63, .45); border: 1px solid var(--line); }
 .bienv { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(228, 233, 243, .86); backdrop-filter: blur(2px); z-index: 5; }
 html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
 .bienv-caja { width: 520px; max-width: 100%; background: var(--surface); border-radius: 16px; padding: 26px; box-shadow: 0 24px 70px -20px rgba(11, 31, 63, .5); border-top: 3px solid var(--accent); }
@@ -256,6 +258,8 @@ html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
   const bold = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
   const slug = s => norm(s).replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  /* Nombre estable del archivo de un CV, sin extensión (HTML, JSON y PDF): «Ana Prueba Núñez» → CV_Ana_Prueba_Nunez. */
+  const nombreArchivo = nombre => 'CV_' + (String(nombre || '').normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^A-Za-z0-9]+/).filter(Boolean).map(p => p[0].toUpperCase() + p.slice(1)).join('_') || 'Nuevo');
   const vacio = v => v == null || v === '' || (Array.isArray(v) && v.length === 0);
   const hoy = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 
@@ -632,7 +636,7 @@ html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
     D.body.classList.add('imprimiendo');
     const fin = () => { D.body.classList.remove('imprimiendo'); host.remove(); };
     g.addEventListener('afterprint', fin, { once: true });
-    const t = D.title; D.title = 'CV_' + (slug(data.nombre) || 'cv');
+    const t = D.title; D.title = nombreArchivo(data.nombre); // Chrome y Edge proponen el título como nombre del PDF
     setTimeout(() => { g.print(); D.title = t; }, 80);
   }
 
@@ -778,7 +782,7 @@ html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
   const debounce = (f, ms) => { let t; return function () { clearTimeout(t); const a = arguments; t = setTimeout(() => f.apply(null, a), ms); }; };
 
   g.CVK = {
-    $, $$, esc, bold, norm, slug, vacio, hoy, SCHEMA, CAMPOS_EN, CATEGORIAS, OFICINAS, AREAS, LABELS, FOTO_GENERICA,
+    $, $$, esc, bold, norm, slug, nombreArchivo, vacio, hoy, SCHEMA, CAMPOS_EN, CATEGORIAS, OFICINAS, AREAS, LABELS, FOTO_GENERICA,
     emptyCV, normalize, clean, pick, tieneEN, urlOk, fotoOk, vacioTotal, comprobar, completitud,
     inferCategoria, inferOficina, ordenCat, derivados, mesesDesde, fechaLarga, textoCompleto,
     extraerJsonDeHtml, jsonDeTexto, leerCVs, expPiezas, firma, firmaExperiencia, firmaFormacion, generarSlides, prepararSlides, montarCV, imprimirCV, procesarFoto, IDB, descargar, guardar, abrir, leerTexto,
@@ -1110,10 +1114,7 @@ html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
   }
 
   /* ---------- Guardado ---------- */
-  function nombreSugerido() {
-    const partes = (S.data.nombre || '').normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^A-Za-z0-9]+/).filter(Boolean).map(p => p[0].toUpperCase() + p.slice(1));
-    return 'CV_' + (partes.join('_') || 'Nuevo') + '.html';
-  }
+  const nombreSugerido = () => K.nombreArchivo(S.data.nombre) + '.html';
   /* Datos tal como se guardan: limpios (clean) y con el «slides» de HTML Maker conservado o regenerado (prepararSlides).
      El slides resultante se queda también en S.data para que el siguiente guardado parta de él. */
   async function datosGuardar() {

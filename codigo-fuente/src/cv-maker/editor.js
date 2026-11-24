@@ -320,10 +320,7 @@
   }
 
   /* ---------- Guardado ---------- */
-  function nombreSugerido() {
-    const partes = (S.data.nombre || '').normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^A-Za-z0-9]+/).filter(Boolean).map(p => p[0].toUpperCase() + p.slice(1));
-    return 'CV_' + (partes.join('_') || 'Nuevo') + '.html';
-  }
+  const nombreSugerido = () => K.nombreArchivo(S.data.nombre) + '.html';
   /* Datos tal como se guardan: limpios (clean) y con el «slides» de HTML Maker conservado o regenerado (prepararSlides).
      El slides resultante se queda también en S.data para que el siguiente guardado parta de él. */
   async function datosGuardar() {
