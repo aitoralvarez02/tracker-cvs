@@ -25,7 +25,7 @@ Es el mismo JSON que el de HTML Maker, con una clave opcional `meta` añadida.
 | `nombre` | texto | Obligatorio para guardar. Es igual en ES y en EN. |
 | `cargo` | texto | |
 | `empresa` | texto | Por defecto `KPMG España`. |
-| `foto` | texto | Solo vale `data:image/(jpeg\|png\|webp\|gif);base64,…`. Con cualquier otro valor se pinta la foto genérica. El editor recorta la foto a 276×324 en JPEG. |
+| `foto` | texto | Solo vale `data:image/(jpeg\|png\|webp\|gif);base64,…`. Con cualquier otro valor se pinta la foto genérica. Una ruta (p. ej. `../../assets/maestro-cvs/fotos-equipo/X.jpg` de HTML Maker) se conserva al guardar hasta que se sustituya, y el editor avisa al abrir el CV de que hay que subir la foto. El editor recorta la foto a 276×324 en JPEG. |
 | `linkedin` | texto | Solo se pinta si es un enlace `http(s)://…` válido (ver «Seguridad»). Si no lo es, se guarda vacío. |
 | `tendencias` | texto | Artículo en KPMG Tendencias. Mismas reglas que `linkedin`. |
 | `insights` | texto[] | De 3 a 4 frases de resumen. No salen en el lienzo del CV, solo en el visor. |

@@ -27,6 +27,7 @@
     if (d) { S.data = d; S.modo = K.vacioTotal(d) ? 'editar' : 'ver'; }
     montar();
     if (!d || K.vacioTotal(S.data)) recuperarBorrador();
+    else avisoFotoRuta();
     addEventListener('beforeunload', e => { if (S.sucio) { e.preventDefault(); e.returnValue = ''; } });
     addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); guardar(); } });
     addEventListener('dragover', e => { if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) e.preventDefault(); });
@@ -77,6 +78,16 @@
     const c = K.comprobar(S.data).filter(x => x.sec === sec && (x.req || !x.ok) && !(x.soloSiHay && x.ok));
     const pend = c.filter(x => !x.ok).length;
     return pend ? '<span class="sec-est sec-est--pend" title="' + pend + ' pendiente(s)">' + pend + '</span>' : '<span class="sec-est sec-est--ok" title="Completo">✓</span>';
+  }
+  /* Foto como ruta (p. ej. «../../assets/maestro-cvs/fotos-equipo/X.jpg» en los JSON de HTML Maker): no se puede
+     mostrar aquí (solo data:image), pero se conserva al guardar hasta que se suba otra. */
+  const fotoRuta = () => !!(S.data.foto && S.data.foto.trim() && !K.fotoOk(S.data.foto));
+  function avisoFotoRuta() {
+    if (!fotoRuta()) return;
+    K.dialogo({ titulo: 'Hay que subir la foto', ancho: 500,
+      cuerpo: '<p class="dlg-p">Este CV trae la foto como una ruta de HTML Maker:</p><p class="dlg-p"><code>' + esc(S.data.foto) + '</code></p>' +
+        '<p class="dlg-p">El CV Maker solo puede mostrar fotos subidas a la herramienta, así que de momento se ve la foto genérica. Súbela en «Persona → Foto». Mientras no la sustituyas, la ruta se conserva al guardar.</p>',
+      botones: [{ texto: 'Más tarde', clase: 'btn--ghost' }, { texto: 'Subir foto', clase: 'btn--prim', cb() { S.modo = 'editar'; aplicarModo(); S.abierto.persona = true; pintarPanel(); elegirFoto(); } }] });
   }
   const ph = (k) => esEN() ? (typeof S.data[k] === 'string' ? S.data[k] : '') : '';
   function campoTexto(k, titulo, o) {
@@ -129,7 +140,9 @@
         campoTexto('empresa', 'Empresa / zona', { req: true, campo: 'empresa', ph: en ? (d.empresa || '') : 'KPMG España' }) +
         '<div class="campo foto-campo" data-campo="foto"><span>Foto<b class="req">*</b></span><div class="foto-fila"><div class="foto-prev"><img src="' + (foto ? d.foto : K.FOTO_GENERICA) + '" alt=""></div><div>' +
         '<button class="btn btn--sm" data-acc="foto">' + (foto ? 'Cambiar foto' : 'Subir foto') + '</button> ' + (foto ? '<button class="btn btn--sm btn--ghost" data-acc="foto-quita">Quitar</button>' : '') +
-        '<p class="ayuda">También puedes arrastrar una imagen a la página. Se recorta en vertical (92×108) automáticamente.</p></div></div><input type="file" id="foto-in" accept="image/*" hidden></div>' +
+        '<p class="ayuda">También puedes arrastrar una imagen a la página. Se recorta en vertical (92×108) automáticamente.</p></div></div>' +
+        (fotoRuta() ? '<p class="aviso-foto" role="alert"><b>Falta subir la foto.</b> Este CV la trae como ruta de HTML Maker (<code>' + esc(d.foto) + '</code>), que aquí no se puede mostrar. Pulsa «Subir foto». Mientras no la sustituyas, la ruta se conserva al guardar.</p>' : '') +
+        '<input type="file" id="foto-in" accept="image/*" hidden></div>' +
         campoTexto('linkedin', 'LinkedIn', { campo: 'links', ph: 'https://www.linkedin.com/in/…', spell: false, nota: en ? 'igual en ES y EN' : 'opcional' }) +
         campoTexto('tendencias', 'KPMG Tendencias', { campo: 'links', ph: 'https://…', spell: false, nota: 'opcional' }),
       visor:
@@ -204,7 +217,7 @@
       case 'baja-b': if (mover(get('cuerpo'), i, 1)) { pintarPanel(); cambio(); } break;
       case 'negrita': negrita(t.closest('.bloque')); break;
       case 'quita-area': S.data.meta.areas.splice(i, 1); pintarPanel(); cambio(); break;
-      case 'foto': $('#foto-in').click(); break;
+      case 'foto': elegirFoto(); break;
       case 'foto-quita': S.data.foto = ''; pintarPanel(); cambio(); break;
       case 'guardar': guardar(); break;
       case 'guardar-como': guardar(true); break;
@@ -219,7 +232,6 @@
       case 'empezar': S.abierto.persona = true; pintarPanel(); { const n = $('[data-k="nombre"]'); if (n) n.focus(); } break;
       case 'ver-editar': S.modo = 'editar'; aplicarModo(); break;
     }
-    if (a === 'foto') { const fi = $('#foto-in'); fi.onchange = () => { if (fi.files[0]) ponerFoto(fi.files[0]); fi.value = ''; }; }
   }
   const toast = K.toast;
   function negrita(bloque) {
@@ -236,6 +248,11 @@
     }
     if (e.target && e.target.id === 'area-in' && e.key === 'Backspace' && !e.target.value && S.data.meta.areas.length) { S.data.meta.areas.pop(); pintarPanel(); $('#area-in').focus(); cambio(); }
   });
+  function elegirFoto() {
+    const fi = $('#foto-in'); if (!fi) return;
+    fi.onchange = () => { if (fi.files[0]) ponerFoto(fi.files[0]); fi.value = ''; };
+    fi.click();
+  }
   async function ponerFoto(file) {
     try { S.data.foto = await K.procesarFoto(file); pintarPanel(); cambio(); toast('Foto añadida.', 'ok'); } catch (err) { toast(err.message, 'error'); }
   }
@@ -362,6 +379,7 @@
       const l = K.leerCVs(nombre, texto);
       S.data = l[0]; S.asa = (asa && /\.html?$/i.test(nombre)) ? asa : null; S.nombreArchivo = nombre; S.sucio = false; S.guardadoEn = null;
       S.modo = 'ver'; aplicarModo(); refrescarTodo();
+      avisoFotoRuta();
       toast(l.length > 1 ? 'El archivo tenía ' + l.length + ' CVs; se ha abierto el primero.' : 'CV abierto: ' + (S.data.nombre || nombre), 'ok');
     } catch (err) { toast('No se pudo abrir «' + nombre + '»: ' + err.message, 'error'); }
   }

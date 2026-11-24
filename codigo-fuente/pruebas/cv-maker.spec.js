@@ -98,6 +98,8 @@ test('el CV guardado se abre solo y muestra el CV', async ({ page }) => {
 test('seguridad: no ejecuta HTML ajeno y filtra enlaces y fotos', async ({ page }) => {
   await abrirEditor(page);
   await abrirCV(page, FIX('cv-malicioso.json'));
+  await expect(page.locator('.dlg h2')).toHaveText('Hay que subir la foto'); // su foto es una URL, no data:image
+  await page.locator('.dlg .btn--ghost').click();
   const cv = page.locator('#cvbox .cv-lienzo');
   await expect(cv.locator('.cv-nombre img')).toHaveCount(0);
   await expect(cv.locator('.cv-texto b')).toHaveCount(0);
@@ -308,4 +310,29 @@ test('slides: la columna azul se regenera como la pinta el CV Maker (posición y
   const top = await p2.locator('#cvbox .cv-formacion').evaluate(e => e.offsetTop);
   expect(top).toBeGreaterThan(388);
   expect(datosDe((await guardar(p2)).texto).slides.columna).toEqual({ formacion: top });
+});
+
+test('foto con ruta de HTML Maker: avisa de que hay que subirla y conserva la ruta hasta sustituirla', async ({ page }) => {
+  await abrirEditor(page);
+  const cv = JSON.parse(fs.readFileSync(FIX('cv-completo.json'), 'utf8'));
+  cv.foto = '../../assets/maestro-cvs/fotos-equipo/Ana_Prueba.jpg';
+  await abrirJson(page, cv, 'con-ruta.json');
+  const dlg = page.locator('.dlg');
+  await expect(dlg.locator('h2')).toHaveText('Hay que subir la foto');
+  await expect(dlg).toContainText('../../assets/maestro-cvs/fotos-equipo/Ana_Prueba.jpg');
+  await dlg.locator('.btn--ghost').click();
+  expect(await page.locator('#cvbox .cv-foto').getAttribute('src')).toMatch(/^data:image\/svg\+xml,/);
+  // se guarda con la ruta y, al abrir el HTML guardado, vuelve a avisar
+  const g = await guardar(page);
+  expect(datosDe(g.texto).foto).toBe(cv.foto);
+  const p2 = await page.context().newPage();
+  await abrirEditor(p2, pathToFileURL(g.ruta).href);
+  await expect(p2.locator('.dlg h2')).toHaveText('Hay que subir la foto');
+  // «Subir foto» lleva al campo; el aviso del panel desaparece al subirla
+  const [fc] = await Promise.all([p2.waitForEvent('filechooser'), p2.locator('.dlg .btn--prim').click()]);
+  await expect(p2.locator('#panel .aviso-foto')).toBeVisible();
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8z8DAwMDAxMDAwMDAAAANHQEDasKb6QAAAABJRU5ErkJggg==', 'base64');
+  await fc.setFiles({ name: 'foto.png', mimeType: 'image/png', buffer: png });
+  await expect(p2.locator('#panel .aviso-foto')).toHaveCount(0);
+  await expect(p2.locator('#cvbox .cv-foto')).toHaveAttribute('src', /^data:image\/jpeg;base64,/);
 });
