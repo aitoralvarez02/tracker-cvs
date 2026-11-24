@@ -31,6 +31,7 @@ body { font-family: 'Open Sans', 'Segoe UI', system-ui, sans-serif; font-size: 1
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 [hidden] { display: none !important; }
+.sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 #app { height: 100vh; display: flex; flex-direction: column; min-height: 0; }
 
 /* barra superior */
@@ -63,6 +64,10 @@ button { cursor: pointer; }
 .btn--prim:hover { background: #163bc4; border-color: #163bc4; }
 .btn--ghost { background: transparent; }
 .btn--peligro { background: var(--bad); border-color: var(--bad); color: #fff; }
+/* Contraste AA del texto blanco en noche (los tonos claros de --brand2 y --bad no llegan a 4,5:1). */
+html[data-tema="noche"] .btn--prim { background: #3D5EE8; border-color: #3D5EE8; }
+html[data-tema="noche"] .btn--prim:hover { background: #3352D6; border-color: #3352D6; }
+html[data-tema="noche"] .btn--peligro { background: #C8102E; border-color: #C8102E; }
 .btn--sm { height: 28px; padding: 0 10px; font-size: 12px; border-radius: 7px; }
 .btn--icono { width: 34px; padding: 0; }
 .btn--sm.btn--icono { width: 28px; }
@@ -74,6 +79,8 @@ button { cursor: pointer; }
 .menu-lista { position: absolute; right: 0; top: calc(100% + 6px); min-width: 250px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 18px 40px -12px rgba(11, 31, 63, .4); padding: 6px; z-index: 40; }
 .menu-lista button { display: flex; width: 100%; text-align: left; align-items: center; gap: 10px; padding: 9px 10px; border: 0; background: transparent; border-radius: 7px; font-size: 13px; }
 .menu-lista button:hover { background: var(--surface2); }
+.menu-lista button:focus-visible, .dlg-x:focus-visible, .sec-cab:focus-visible, .chip button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.menu-lista button:focus-visible { background: var(--surface2); }
 .menu-lista small { display: block; color: var(--ink3); font-size: 11.5px; }
 .menu-lista hr { border: 0; border-top: 1px solid var(--line); margin: 5px 0; }
 
@@ -85,6 +92,7 @@ button { cursor: pointer; }
 input[type="text"], input[type="search"], input[type="url"], select, textarea { width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 8px 10px; font-size: 13.5px; line-height: 1.4; transition: border-color .15s, box-shadow .15s; }
 input[type="text"]:hover, textarea:hover, select:hover { border-color: var(--ink3); }
 input:focus, textarea:focus, select:focus { border-color: var(--brand2); box-shadow: 0 0 0 3px rgba(30, 73, 226, .15); outline: none; }
+::placeholder { color: var(--ink3); opacity: 1; }
 textarea { resize: vertical; min-height: 84px; font-family: inherit; }
 .ayuda { font-size: 12px; color: var(--ink3); margin: 4px 0 0; line-height: 1.45; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -105,7 +113,7 @@ textarea { resize: vertical; min-height: 84px; font-family: inherit; }
 #toasts { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 400; pointer-events: none; }
 .toast { opacity: 0; transform: translateY(14px); background: #0B1F3F; color: #fff; padding: 10px 18px; border-radius: 10px; font-size: 13.5px; transition: all .25s; box-shadow: 0 12px 30px rgba(0, 0, 0, .35); max-width: 80vw; }
 .toast.on { opacity: 1; transform: none; }
-.toast--error { background: var(--bad); } .toast--ok { background: #00756F; } .toast--aviso { background: #8F5600; }
+.toast--error { background: #C8102E; } .toast--ok { background: #00756F; } .toast--aviso { background: #8F5600; }
 @keyframes fundir { from { opacity: 0; } } @keyframes subir { from { transform: translateY(10px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 .vacio-estado { text-align: center; color: var(--ink3); padding: 40px 20px; }
@@ -745,27 +753,55 @@ html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
     setTimeout(() => { t.classList.remove('on'); setTimeout(() => t.remove(), 300); }, tipo === 'aviso' ? 10000 : tipo === 'error' ? 6000 : 3200);
   }
   /* dialogo({titulo, cuerpo: Node|string(html), botones:[{texto, clase, cb → false para no cerrar}], ancho, cerrar}) */
+  /* Pila de diálogos abiertos: solo el de arriba atiende Escape y Tab. */
+  const PILA_DLG = [];
+  let nDlg = 0;
+  const ENFOCABLES = 'button:not([disabled]), [href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
   function dialogo(o) {
+    const id = 'dlg-' + (++nDlg);
     const fondo = D.createElement('div'); fondo.className = 'dlg-fondo';
-    const v = D.createElement('div'); v.className = 'dlg'; v.setAttribute('role', 'dialog'); v.setAttribute('aria-modal', 'true'); if (o.ancho) v.style.width = o.ancho + 'px'; if (o.clase) v.classList.add(o.clase);
-    v.innerHTML = '<div class="dlg-cab"><h2></h2><button class="dlg-x" aria-label="Cerrar">×</button></div><div class="dlg-cuerpo"></div><div class="dlg-pie"></div>';
+    const v = D.createElement('div'); v.className = 'dlg'; v.setAttribute('role', 'dialog'); v.setAttribute('aria-modal', 'true'); v.tabIndex = -1;
+    v.setAttribute('aria-labelledby', id + '-t'); v.setAttribute('aria-describedby', id + '-c');
+    if (o.ancho) v.style.width = o.ancho + 'px'; if (o.clase) v.classList.add(o.clase);
+    v.innerHTML = '<div class="dlg-cab"><h2 id="' + id + '-t"></h2><button type="button" class="dlg-x" aria-label="Cerrar">×</button></div><div class="dlg-cuerpo" id="' + id + '-c"></div><div class="dlg-pie"></div>';
     $('h2', v).textContent = o.titulo || '';
     const cu = $('.dlg-cuerpo', v); if (typeof o.cuerpo === 'string') cu.innerHTML = o.cuerpo; else if (o.cuerpo) cu.appendChild(o.cuerpo);
     const pie = $('.dlg-pie', v);
     const prevFoco = D.activeElement;
-    const api = { el: v, cuerpo: cu, pie, cerrar() { fondo.remove(); D.removeEventListener('keydown', tecla, true); if (prevFoco && prevFoco.focus) try { prevFoco.focus(); } catch (e) { } if (o.alCerrar) o.alCerrar(); } };
+    let cerrado = false;
+    const api = { el: v, cuerpo: cu, pie, cerrar() {
+      if (cerrado) return; cerrado = true;
+      fondo.remove(); D.removeEventListener('keydown', tecla, true); D.removeEventListener('focusin', retener, true);
+      const i = PILA_DLG.indexOf(api); if (i >= 0) PILA_DLG.splice(i, 1);
+      if (prevFoco && prevFoco.focus && D.body.contains(prevFoco)) try { prevFoco.focus(); } catch (e) { }
+      if (o.alCerrar) o.alCerrar();
+    } };
     (o.botones || []).forEach(b => {
       const bt = D.createElement('button'); bt.type = 'button'; bt.className = 'btn ' + (b.clase || ''); bt.textContent = b.texto;
       bt.addEventListener('click', async () => { const r = b.cb ? await b.cb(api) : undefined; if (r !== false) api.cerrar(); });
       pie.appendChild(bt); b.el = bt;
     });
     if (!(o.botones || []).length) pie.remove();
-    function tecla(e) { if (e.key === 'Escape') { e.stopPropagation(); api.cerrar(); } }
+    const enfocables = () => $$(ENFOCABLES, v).filter(x => x.offsetParent !== null);
+    /* Foco retenido: Tab y Mayús+Tab dan la vuelta dentro del diálogo; Escape lo cierra. */
+    function tecla(e) {
+      if (PILA_DLG[PILA_DLG.length - 1] !== api) return;
+      if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); api.cerrar(); return; }
+      if (e.key !== 'Tab') return;
+      const f = enfocables(); if (!f.length) { e.preventDefault(); v.focus(); return; }
+      const i = f.indexOf(D.activeElement);
+      if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); }
+      else if (!e.shiftKey && (i === f.length - 1 || i < 0)) { e.preventDefault(); f[0].focus(); }
+    }
+    function retener(e) { if (PILA_DLG[PILA_DLG.length - 1] === api && !v.contains(e.target)) { const f = enfocables(); (f[0] || v).focus(); } }
+    PILA_DLG.push(api);
     D.addEventListener('keydown', tecla, true);
+    D.addEventListener('focusin', retener, true);
     $('.dlg-x', v).addEventListener('click', api.cerrar);
     fondo.addEventListener('mousedown', e => { if (e.target === fondo) api.cerrar(); });
     fondo.appendChild(v); capas().appendChild(fondo);
-    const f = $('[autofocus], input, textarea, select', cu) || $('.btn--prim', v); if (f) setTimeout(() => f.focus(), 30);
+    const f = $('[autofocus], input, textarea, select', cu) || $('.btn--prim', v) || $('.dlg-pie .btn:last-child', v) || v;
+    setTimeout(() => { if (!cerrado) f.focus(); }, 30);
     return api;
   }
   function confirmar(titulo, msg, textoOk, peligro) {
@@ -832,23 +868,24 @@ html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
   function montar() {
     $('#app').innerHTML =
       '<header class="top">' +
+      '<h1 class="sr-only">CV Maker: editor de CV de KPMG</h1>' +
       '<div class="marca"><img src="' + (window.__LOGO__ || '') + '" alt="KPMG"><b>CV Maker</b><small>Editor de CV</small></div>' +
       '<div class="seg" role="group" aria-label="Modo"><button data-modo="editar" aria-pressed="true">✎ Editar</button><button data-modo="ver" aria-pressed="false">▤ Ver CV</button></div>' +
       '<div class="seg" role="group" aria-label="Idioma del CV"><button data-lang="es" aria-pressed="true">ES</button><button data-lang="en" aria-pressed="false">EN</button></div>' +
       '<div class="esp"></div>' +
       '<button class="btn" id="btn-comp" title="Qué falta por completar"></button>' +
       '<span class="estado" id="estado" data-e=""><i></i><span></span></span>' +
-      '<div class="menu"><button class="btn" id="btn-copilot">Copilot ▾</button><div class="menu-lista" id="menu-copilot" hidden>' +
-      '<button data-acc="importar-copilot">Importar mi CV con Copilot<small>Pega tu CV de Word/PowerPoint y rellena todo</small></button>' +
-      '<button data-acc="traducir-copilot">Traducir al inglés con Copilot<small>Genera la versión EN a partir del español</small></button></div></div>' +
+      '<div class="menu"><button class="btn" id="btn-copilot" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-copilot">Copilot ▾</button><div class="menu-lista" id="menu-copilot" role="menu" aria-label="Copilot" hidden>' +
+      '<button role="menuitem" data-acc="importar-copilot">Importar mi CV con Copilot<small>Pega tu CV de Word/PowerPoint y rellena todo</small></button>' +
+      '<button role="menuitem" data-acc="traducir-copilot">Traducir al inglés con Copilot<small>Genera la versión EN a partir del español</small></button></div></div>' +
       '<button class="btn" data-acc="abrir">Abrir CV</button>' +
       '<button class="btn btn--prim" data-acc="guardar" title="Ctrl+S">Guardar</button>' +
-      '<div class="menu"><button class="btn btn--icono" id="btn-mas" aria-label="Más opciones">⋯</button><div class="menu-lista" id="menu-mas" hidden>' +
-      '<button data-acc="guardar-como">Guardar como…<small>Elegir otra carpeta o nombre</small></button>' +
-      '<button data-acc="descargar">Descargar una copia</button>' +
-      '<button data-acc="imprimir">Imprimir / guardar en PDF</button>' +
-      '<button data-acc="json">Exportar datos (JSON)<small>Mismo formato que el catálogo de HTML Maker</small></button><hr>' +
-      '<button data-acc="tema">Cambiar modo día / noche</button><button data-acc="nuevo">Nuevo CV en blanco</button></div></div>' +
+      '<div class="menu"><button class="btn btn--icono" id="btn-mas" aria-label="Más opciones" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-mas">⋯</button><div class="menu-lista" id="menu-mas" role="menu" aria-label="Más opciones" hidden>' +
+      '<button role="menuitem" data-acc="guardar-como">Guardar como…<small>Elegir otra carpeta o nombre</small></button>' +
+      '<button role="menuitem" data-acc="descargar">Descargar una copia</button>' +
+      '<button role="menuitem" data-acc="imprimir">Imprimir / guardar en PDF</button>' +
+      '<button role="menuitem" data-acc="json">Exportar datos (JSON)<small>Mismo formato que el catálogo de HTML Maker</small></button><hr role="separator">' +
+      '<button role="menuitem" data-acc="tema">Cambiar modo día / noche</button><button role="menuitem" data-acc="nuevo">Nuevo CV en blanco</button></div></div>' +
       '</header>' +
       '<div class="cuerpo"><aside class="panel" id="panel" aria-label="Formulario del CV"></aside>' +
       '<main class="vista" id="vista"><div class="vista-caja" id="cvbox"></div>' +
@@ -863,8 +900,31 @@ html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
     D_cierraMenus();
     aplicarModo(); pintarPanel(); pintarEstado(); pintarBienvenida();
   }
+  /* Menús desplegables (Copilot y ⋯): aria-expanded en el botón, flechas para moverse, Escape cierra y devuelve el foco. */
   function D_cierraMenus() {
-    document.addEventListener('click', e => { if (!e.target.closest('.menu')) $$('.menu-lista').forEach(m => m.hidden = true); });
+    document.addEventListener('click', e => { if (!e.target.closest('.menu')) cerrarMenus(); });
+    document.addEventListener('keydown', e => {
+      const abierto = $$('.menu-lista').find(m => !m.hidden); if (!abierto) return;
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cerrarMenus(true); return; }
+      const items = $$('[role="menuitem"]', abierto), i = items.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const d = e.key === 'ArrowDown' ? 1 : -1; items[(i + d + items.length) % items.length].focus(); }
+      else if (e.key === 'Home' || e.key === 'End') { e.preventDefault(); items[e.key === 'Home' ? 0 : items.length - 1].focus(); }
+      else if (e.key === 'Tab') cerrarMenus();
+    });
+  }
+  function cerrarMenus(devolverFoco) {
+    $$('.menu-lista').forEach(m => {
+      const b = $('#' + m.id.replace('menu-', 'btn-'));
+      if (!m.hidden && devolverFoco && b) b.focus();
+      m.hidden = true; if (b) b.setAttribute('aria-expanded', 'false');
+    });
+  }
+  function alternarMenu(nombre) {
+    const m = $('#menu-' + nombre), b = $('#btn-' + nombre), abrir = m.hidden;
+    cerrarMenus();
+    if (!abrir) return;
+    m.hidden = false; b.setAttribute('aria-expanded', 'true');
+    const p = $('[role="menuitem"]', m); if (p) p.focus();
   }
 
   /* ---------- Panel de formulario ---------- */
@@ -989,10 +1049,10 @@ html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
   }
   function alClic(e) {
     const t = e.target.closest('[data-acc],[data-modo],[data-lang],#btn-comp,#btn-copilot,#btn-mas'); if (!t) return;
-    if (t.id === 'btn-copilot') { $('#menu-copilot').hidden = !$('#menu-copilot').hidden; $('#menu-mas').hidden = true; return; }
-    if (t.id === 'btn-mas') { $('#menu-mas').hidden = !$('#menu-mas').hidden; $('#menu-copilot').hidden = true; return; }
+    if (t.id === 'btn-copilot') { alternarMenu('copilot'); return; }
+    if (t.id === 'btn-mas') { alternarMenu('mas'); return; }
     if (t.id === 'btn-comp') return dialogoPendientes();
-    $$('.menu-lista').forEach(m => m.hidden = true);
+    cerrarMenus();
     if (t.dataset.modo) { S.modo = t.dataset.modo; aplicarModo(); return; }
     if (t.dataset.lang) { S.lang = t.dataset.lang; aplicarModo(); pintarPanel(); S.ctl.pintar(S.data, S.lang); return; }
     const a = t.dataset.acc, k = t.dataset.k, i = +t.dataset.i;

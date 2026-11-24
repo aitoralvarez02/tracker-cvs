@@ -38,23 +38,24 @@
   function montar() {
     $('#app').innerHTML =
       '<header class="top">' +
+      '<h1 class="sr-only">CV Maker: editor de CV de KPMG</h1>' +
       '<div class="marca"><img src="' + (window.__LOGO__ || '') + '" alt="KPMG"><b>CV Maker</b><small>Editor de CV</small></div>' +
       '<div class="seg" role="group" aria-label="Modo"><button data-modo="editar" aria-pressed="true">✎ Editar</button><button data-modo="ver" aria-pressed="false">▤ Ver CV</button></div>' +
       '<div class="seg" role="group" aria-label="Idioma del CV"><button data-lang="es" aria-pressed="true">ES</button><button data-lang="en" aria-pressed="false">EN</button></div>' +
       '<div class="esp"></div>' +
       '<button class="btn" id="btn-comp" title="Qué falta por completar"></button>' +
       '<span class="estado" id="estado" data-e=""><i></i><span></span></span>' +
-      '<div class="menu"><button class="btn" id="btn-copilot">Copilot ▾</button><div class="menu-lista" id="menu-copilot" hidden>' +
-      '<button data-acc="importar-copilot">Importar mi CV con Copilot<small>Pega tu CV de Word/PowerPoint y rellena todo</small></button>' +
-      '<button data-acc="traducir-copilot">Traducir al inglés con Copilot<small>Genera la versión EN a partir del español</small></button></div></div>' +
+      '<div class="menu"><button class="btn" id="btn-copilot" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-copilot">Copilot ▾</button><div class="menu-lista" id="menu-copilot" role="menu" aria-label="Copilot" hidden>' +
+      '<button role="menuitem" data-acc="importar-copilot">Importar mi CV con Copilot<small>Pega tu CV de Word/PowerPoint y rellena todo</small></button>' +
+      '<button role="menuitem" data-acc="traducir-copilot">Traducir al inglés con Copilot<small>Genera la versión EN a partir del español</small></button></div></div>' +
       '<button class="btn" data-acc="abrir">Abrir CV</button>' +
       '<button class="btn btn--prim" data-acc="guardar" title="Ctrl+S">Guardar</button>' +
-      '<div class="menu"><button class="btn btn--icono" id="btn-mas" aria-label="Más opciones">⋯</button><div class="menu-lista" id="menu-mas" hidden>' +
-      '<button data-acc="guardar-como">Guardar como…<small>Elegir otra carpeta o nombre</small></button>' +
-      '<button data-acc="descargar">Descargar una copia</button>' +
-      '<button data-acc="imprimir">Imprimir / guardar en PDF</button>' +
-      '<button data-acc="json">Exportar datos (JSON)<small>Mismo formato que el catálogo de HTML Maker</small></button><hr>' +
-      '<button data-acc="tema">Cambiar modo día / noche</button><button data-acc="nuevo">Nuevo CV en blanco</button></div></div>' +
+      '<div class="menu"><button class="btn btn--icono" id="btn-mas" aria-label="Más opciones" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-mas">⋯</button><div class="menu-lista" id="menu-mas" role="menu" aria-label="Más opciones" hidden>' +
+      '<button role="menuitem" data-acc="guardar-como">Guardar como…<small>Elegir otra carpeta o nombre</small></button>' +
+      '<button role="menuitem" data-acc="descargar">Descargar una copia</button>' +
+      '<button role="menuitem" data-acc="imprimir">Imprimir / guardar en PDF</button>' +
+      '<button role="menuitem" data-acc="json">Exportar datos (JSON)<small>Mismo formato que el catálogo de HTML Maker</small></button><hr role="separator">' +
+      '<button role="menuitem" data-acc="tema">Cambiar modo día / noche</button><button role="menuitem" data-acc="nuevo">Nuevo CV en blanco</button></div></div>' +
       '</header>' +
       '<div class="cuerpo"><aside class="panel" id="panel" aria-label="Formulario del CV"></aside>' +
       '<main class="vista" id="vista"><div class="vista-caja" id="cvbox"></div>' +
@@ -69,8 +70,31 @@
     D_cierraMenus();
     aplicarModo(); pintarPanel(); pintarEstado(); pintarBienvenida();
   }
+  /* Menús desplegables (Copilot y ⋯): aria-expanded en el botón, flechas para moverse, Escape cierra y devuelve el foco. */
   function D_cierraMenus() {
-    document.addEventListener('click', e => { if (!e.target.closest('.menu')) $$('.menu-lista').forEach(m => m.hidden = true); });
+    document.addEventListener('click', e => { if (!e.target.closest('.menu')) cerrarMenus(); });
+    document.addEventListener('keydown', e => {
+      const abierto = $$('.menu-lista').find(m => !m.hidden); if (!abierto) return;
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cerrarMenus(true); return; }
+      const items = $$('[role="menuitem"]', abierto), i = items.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const d = e.key === 'ArrowDown' ? 1 : -1; items[(i + d + items.length) % items.length].focus(); }
+      else if (e.key === 'Home' || e.key === 'End') { e.preventDefault(); items[e.key === 'Home' ? 0 : items.length - 1].focus(); }
+      else if (e.key === 'Tab') cerrarMenus();
+    });
+  }
+  function cerrarMenus(devolverFoco) {
+    $$('.menu-lista').forEach(m => {
+      const b = $('#' + m.id.replace('menu-', 'btn-'));
+      if (!m.hidden && devolverFoco && b) b.focus();
+      m.hidden = true; if (b) b.setAttribute('aria-expanded', 'false');
+    });
+  }
+  function alternarMenu(nombre) {
+    const m = $('#menu-' + nombre), b = $('#btn-' + nombre), abrir = m.hidden;
+    cerrarMenus();
+    if (!abrir) return;
+    m.hidden = false; b.setAttribute('aria-expanded', 'true');
+    const p = $('[role="menuitem"]', m); if (p) p.focus();
   }
 
   /* ---------- Panel de formulario ---------- */
@@ -195,10 +219,10 @@
   }
   function alClic(e) {
     const t = e.target.closest('[data-acc],[data-modo],[data-lang],#btn-comp,#btn-copilot,#btn-mas'); if (!t) return;
-    if (t.id === 'btn-copilot') { $('#menu-copilot').hidden = !$('#menu-copilot').hidden; $('#menu-mas').hidden = true; return; }
-    if (t.id === 'btn-mas') { $('#menu-mas').hidden = !$('#menu-mas').hidden; $('#menu-copilot').hidden = true; return; }
+    if (t.id === 'btn-copilot') { alternarMenu('copilot'); return; }
+    if (t.id === 'btn-mas') { alternarMenu('mas'); return; }
     if (t.id === 'btn-comp') return dialogoPendientes();
-    $$('.menu-lista').forEach(m => m.hidden = true);
+    cerrarMenus();
     if (t.dataset.modo) { S.modo = t.dataset.modo; aplicarModo(); return; }
     if (t.dataset.lang) { S.lang = t.dataset.lang; aplicarModo(); pintarPanel(); S.ctl.pintar(S.data, S.lang); return; }
     const a = t.dataset.acc, k = t.dataset.k, i = +t.dataset.i;

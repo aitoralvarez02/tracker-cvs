@@ -495,27 +495,55 @@
     setTimeout(() => { t.classList.remove('on'); setTimeout(() => t.remove(), 300); }, tipo === 'aviso' ? 10000 : tipo === 'error' ? 6000 : 3200);
   }
   /* dialogo({titulo, cuerpo: Node|string(html), botones:[{texto, clase, cb → false para no cerrar}], ancho, cerrar}) */
+  /* Pila de diálogos abiertos: solo el de arriba atiende Escape y Tab. */
+  const PILA_DLG = [];
+  let nDlg = 0;
+  const ENFOCABLES = 'button:not([disabled]), [href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
   function dialogo(o) {
+    const id = 'dlg-' + (++nDlg);
     const fondo = D.createElement('div'); fondo.className = 'dlg-fondo';
-    const v = D.createElement('div'); v.className = 'dlg'; v.setAttribute('role', 'dialog'); v.setAttribute('aria-modal', 'true'); if (o.ancho) v.style.width = o.ancho + 'px'; if (o.clase) v.classList.add(o.clase);
-    v.innerHTML = '<div class="dlg-cab"><h2></h2><button class="dlg-x" aria-label="Cerrar">×</button></div><div class="dlg-cuerpo"></div><div class="dlg-pie"></div>';
+    const v = D.createElement('div'); v.className = 'dlg'; v.setAttribute('role', 'dialog'); v.setAttribute('aria-modal', 'true'); v.tabIndex = -1;
+    v.setAttribute('aria-labelledby', id + '-t'); v.setAttribute('aria-describedby', id + '-c');
+    if (o.ancho) v.style.width = o.ancho + 'px'; if (o.clase) v.classList.add(o.clase);
+    v.innerHTML = '<div class="dlg-cab"><h2 id="' + id + '-t"></h2><button type="button" class="dlg-x" aria-label="Cerrar">×</button></div><div class="dlg-cuerpo" id="' + id + '-c"></div><div class="dlg-pie"></div>';
     $('h2', v).textContent = o.titulo || '';
     const cu = $('.dlg-cuerpo', v); if (typeof o.cuerpo === 'string') cu.innerHTML = o.cuerpo; else if (o.cuerpo) cu.appendChild(o.cuerpo);
     const pie = $('.dlg-pie', v);
     const prevFoco = D.activeElement;
-    const api = { el: v, cuerpo: cu, pie, cerrar() { fondo.remove(); D.removeEventListener('keydown', tecla, true); if (prevFoco && prevFoco.focus) try { prevFoco.focus(); } catch (e) { } if (o.alCerrar) o.alCerrar(); } };
+    let cerrado = false;
+    const api = { el: v, cuerpo: cu, pie, cerrar() {
+      if (cerrado) return; cerrado = true;
+      fondo.remove(); D.removeEventListener('keydown', tecla, true); D.removeEventListener('focusin', retener, true);
+      const i = PILA_DLG.indexOf(api); if (i >= 0) PILA_DLG.splice(i, 1);
+      if (prevFoco && prevFoco.focus && D.body.contains(prevFoco)) try { prevFoco.focus(); } catch (e) { }
+      if (o.alCerrar) o.alCerrar();
+    } };
     (o.botones || []).forEach(b => {
       const bt = D.createElement('button'); bt.type = 'button'; bt.className = 'btn ' + (b.clase || ''); bt.textContent = b.texto;
       bt.addEventListener('click', async () => { const r = b.cb ? await b.cb(api) : undefined; if (r !== false) api.cerrar(); });
       pie.appendChild(bt); b.el = bt;
     });
     if (!(o.botones || []).length) pie.remove();
-    function tecla(e) { if (e.key === 'Escape') { e.stopPropagation(); api.cerrar(); } }
+    const enfocables = () => $$(ENFOCABLES, v).filter(x => x.offsetParent !== null);
+    /* Foco retenido: Tab y Mayús+Tab dan la vuelta dentro del diálogo; Escape lo cierra. */
+    function tecla(e) {
+      if (PILA_DLG[PILA_DLG.length - 1] !== api) return;
+      if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); api.cerrar(); return; }
+      if (e.key !== 'Tab') return;
+      const f = enfocables(); if (!f.length) { e.preventDefault(); v.focus(); return; }
+      const i = f.indexOf(D.activeElement);
+      if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); }
+      else if (!e.shiftKey && (i === f.length - 1 || i < 0)) { e.preventDefault(); f[0].focus(); }
+    }
+    function retener(e) { if (PILA_DLG[PILA_DLG.length - 1] === api && !v.contains(e.target)) { const f = enfocables(); (f[0] || v).focus(); } }
+    PILA_DLG.push(api);
     D.addEventListener('keydown', tecla, true);
+    D.addEventListener('focusin', retener, true);
     $('.dlg-x', v).addEventListener('click', api.cerrar);
     fondo.addEventListener('mousedown', e => { if (e.target === fondo) api.cerrar(); });
     fondo.appendChild(v); capas().appendChild(fondo);
-    const f = $('[autofocus], input, textarea, select', cu) || $('.btn--prim', v); if (f) setTimeout(() => f.focus(), 30);
+    const f = $('[autofocus], input, textarea, select', cu) || $('.btn--prim', v) || $('.dlg-pie .btn:last-child', v) || v;
+    setTimeout(() => { if (!cerrado) f.focus(); }, 30);
     return api;
   }
   function confirmar(titulo, msg, textoOk, peligro) {

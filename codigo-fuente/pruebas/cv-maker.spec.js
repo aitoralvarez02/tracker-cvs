@@ -441,3 +441,74 @@ test('imprimir: el PDF se propone con el mismo nombre que el HTML (CV_Nombre_Ape
   const g = await guardar(page);
   expect(g.nombre).toBe('CV_Ana_Prueba_Nunez.html');
 });
+
+/* ---------- Accesibilidad básica ---------- */
+test('accesibilidad: h1, menús con aria-expanded y Escape, diálogos con nombre y foco retenido', async ({ page }) => {
+  await abrirEditor(page);
+  await expect(page.locator('h1')).toHaveCount(1);
+  await expect(page.locator('h1')).toHaveText(/CV Maker/);
+  // menú ⋯
+  const mas = page.locator('#btn-mas');
+  await expect(mas).toHaveAttribute('aria-haspopup', 'menu');
+  await expect(mas).toHaveAttribute('aria-expanded', 'false');
+  await mas.click();
+  await expect(mas).toHaveAttribute('aria-expanded', 'true');
+  const items = page.locator('#menu-mas [role="menuitem"]');
+  await expect(items.first()).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(items.nth(1)).toBeFocused();
+  await page.keyboard.press('ArrowUp'); await page.keyboard.press('ArrowUp');
+  await expect(items.last()).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#menu-mas')).toBeHidden();
+  await expect(mas).toHaveAttribute('aria-expanded', 'false');
+  await expect(mas).toBeFocused();
+  // diálogo: nombre accesible, Tab no sale de él, Escape lo cierra y devuelve el foco
+  await page.locator('#bienv [data-acc="empezar"]').click();
+  await page.locator('#btn-comp').click();
+  const dlg = page.getByRole('dialog', { name: /Qué falta por completar/ });
+  await expect(dlg).toBeVisible();
+  for (let i = 0; i < 25; i++) {
+    await page.keyboard.press(i % 3 ? 'Tab' : 'Shift+Tab');
+    expect(await page.evaluate(() => !!document.activeElement.closest('.dlg'))).toBe(true);
+  }
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.dlg')).toHaveCount(0);
+  await expect(page.locator('#btn-comp')).toBeFocused();
+});
+
+test('accesibilidad: con dos diálogos, Escape cierra solo el de arriba', async ({ page }) => {
+  await abrirEditor(page);
+  await abrirCV(page, FIX('cv-completo.json'));
+  await page.locator('#btn-copilot').click();
+  await page.locator('#menu-copilot [data-acc="importar-copilot"]').click();
+  await page.locator('#cp-resp').fill(fs.readFileSync(FIX('cv-completo.json'), 'utf8'));
+  await page.locator('.dlg .btn--prim').click();
+  await expect(page.getByRole('dialog', { name: 'Sustituir contenido' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Sustituir contenido' })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Importar mi CV con Copilot' })).toBeVisible();
+});
+
+test('accesibilidad: contraste AA de textos de ayuda y botones en día y noche', async ({ page }) => {
+  await abrirEditor(page);
+  await page.locator('#bienv [data-acc="empezar"]').click();
+  for (const tema of ['dia', 'noche']) {
+    const r = await page.evaluate(tema => {
+      document.documentElement.setAttribute('data-tema', tema);
+      const rgb = s => s.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number);
+      const lum = c => { const v = c.map(x => x / 255).map(x => x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4)); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
+      const ratio = (a, b) => { const x = lum(rgb(a)), y = lum(rgb(b)); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+      const fondo = el => { for (let e = el; e; e = e.parentElement) { const b = getComputedStyle(e).backgroundColor; if (!/rgba\(.*,\s*0\)$/.test(b) && b !== 'transparent') return b; } return 'rgb(255,255,255)'; };
+      const muestra = sel => { const el = document.querySelector(sel); return el ? ratio(getComputedStyle(el).color, fondo(el)) : null; };
+      const prim = document.createElement('button'); prim.className = 'btn btn--prim'; prim.textContent = 'x'; document.querySelector('#panel').appendChild(prim);
+      const pel = document.createElement('button'); pel.className = 'btn btn--peligro'; pel.textContent = 'x'; document.querySelector('#panel').appendChild(pel);
+      const out = { ayuda: muestra('#panel .ayuda'), nota: muestra('#panel .campo > span em'), prim: muestra('#panel .btn--prim'), peligro: muestra('#panel .btn--peligro') };
+      prim.remove(); pel.remove();
+      const ph = getComputedStyle(document.querySelector('#panel input[type="text"]'), '::placeholder').color;
+      out.placeholder = ratio(ph, fondo(document.querySelector('#panel input[type="text"]')));
+      return out;
+    }, tema);
+    for (const [k, v] of Object.entries(r)) expect(v, tema + ' ' + k).toBeGreaterThanOrEqual(4.5);
+  }
+});
