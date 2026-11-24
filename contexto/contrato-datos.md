@@ -32,7 +32,8 @@ Es el mismo JSON que el de HTML Maker, con una clave opcional `meta` añadida.
 | `formacion` | texto[] | Columna izquierda del CV. |
 | `parrafo_azul` | texto | Presentación en azul. Los párrafos se separan con una línea en blanco. El primero va en negrita. Un párrafo que empieza por `- ` se pinta como viñeta. |
 | `cuerpo` | bloque[] | Experiencia. Los tipos de bloque se describen debajo de esta tabla. |
-| `en` | objeto | Versión inglesa de `cargo`, `empresa`, `insights`, `formacion`, `parrafo_azul` y `cuerpo`. Si un campo EN está vacío, se usa el español. |
+| `en` | objeto | Versión inglesa de `cargo`, `empresa`, `insights`, `formacion`, `parrafo_azul` y `cuerpo`. Si un campo EN está vacío, se usa el español. Puede llevar `slides` (ver abajo). |
+| `slides` | objeto | Layout del modo slides de HTML Maker para «Ver CV completo». Lo escribe el CV Maker al guardar (ver «`slides`» más abajo). |
 | `meta` | objeto | Opcional y solo del CV Maker y el CV Hub. HTML Maker la ignora. |
 
 Tipos de bloque de `cuerpo`:
@@ -57,10 +58,33 @@ En todos los textos, `**texto**` se pinta en negrita. El resto del contenido se 
 
 Las listas sugeridas son provisionales y están en `CATEGORIAS`, `OFICINAS` y `AREAS` de `core.js`.
 
+### `slides` (y `en.slides`)
+
+Es el formato de HTML Maker (`cv-equipo.js`, «Modo slides»):
+
+```
+{ base, bloques: [{ html, attrs, x, y, w, h }], lineas: [{ dir, x, y, l }], formacion?: { base, html, attrs }, columna?: { formacion } }
+```
+
+HTML Maker usa `slides` si `base` es la firma del texto actual. Si no, rehace solo el primer bloque con todo el texto y deja los demás, así que un CV de 2 columnas saldría con el texto repetido. Por eso el CV Maker, **al guardar** (también al descargar o exportar el JSON), hace esto (`prepararSlides` en `core.js`):
+
+- **Firma**: la de HTML Maker. `firma(v)` es djb2 sobre `JSON.stringify(v)`, con el formato `(h>>>0).toString(36) + '.' + longitud`. `firmaExperiencia` firma `[parrafo_azul, cuerpo]` y `firmaFormacion` firma `formacion`. Se calcula sobre los datos ya limpios, que son los que se guardan.
+- **Si `slides.base` coincide** con la firma del texto actual, `slides` se conserva tal cual: se respeta el layout manual hecho en HTML Maker. El CV Maker sigue pintando con su ajuste automático.
+- **Si no coincide o no hay `slides`**, se regenera para que HTML Maker muestre lo mismo que el CV Maker:
+  - 1 columna: un bloque `x 0, y 0, w 1140` con el alto de la zona (unos 642 px), y `lineas: []`.
+  - 2 columnas: dos bloques de `w 538` en `x 0` y `x 602` (64 px entre ellos), con el alto de su texto, y una línea `{ dir: "v", x: 562, y: -10, l: alto + 20 }` (10 px por encima y por debajo del texto más alto). El corte es el del CV Maker: entre párrafos o viñetas, y nunca entre la frase que presenta una lista y su primera viñeta. Si la columna derecha empieza por una viñeta, esta lleva `--vin-arriba: 0px`.
+  - `html`: los párrafos con las clases de `experienciaInicial` (`cv-exp-p`, `cv-exp-p--azul`, y `cv-exp-p--punto txt-vin` con `data-vin="flecha" style="--vin-c: #00338D;"`) y todo el texto escapado. Cada párrafo que no es viñeta lleva su hueco inferior en `style="--fmt-despues: Npx;"` (16 px entre párrafos, 26 px tras el párrafo azul), porque HTML Maker deja 0 px entre párrafos.
+  - `attrs`: siempre `data-fmt-inter: "1.15"`, el interlineado «1,15» de HTML Maker (1,362 × 1,15). Si la letra baja de 16 px, también `data-hero-tam` y `style: "--hero-n: N;"`.
+  - Columna azul: `columna: { formacion: top }` solo si la formación no empieza en 388 px (cargo largo), y `formacion: { base, html, attrs }` con `data-hero-tam` solo si su letra baja de 16 px. Si no, no se escriben. Lo manual anterior de la columna azul se pierde, igual que el de los bloques.
+- **EN**: `en.slides` se trata igual con el texto inglés (la firma usa `en.parrafo_azul` y `en.cuerpo`, o el español si faltan), pero solo si hay experiencia EN propia (`en.parrafo_azul` o `en.cuerpo`). Sin ella, HTML Maker usa el `slides` español. Si hubiera un `en.slides` que ya no coincide, se quita para que no repita texto.
+- Guardar dos veces seguidas da el mismo `slides`.
+
+Medidas comprobadas en el editor de HTML Maker (build del 19-11-2026): zona de 1144×643 en `x 400, y 184` del lienzo, bloques de 1140 o 538+64+538, línea de 16 px de caja en `x 562` y formación en `top 388`. Para repetir la comprobación con los 25 CVs de muestra: `node herramientas/comparar-html-maker.js <carpeta> [--fotos]` desde `codigo-fuente/`. Mide cada párrafo, la línea y la formación en los dos y da la mayor diferencia (ahora 0,4 px).
+
 ## 3. Reglas al leer (`normalize`)
 
 - La lectura es tolerante: los tipos incorrectos se convierten y los valores que faltan toman su valor por defecto.
-- **Se conservan las claves desconocidas** del nivel superior, de `en` y de `meta`. Por ejemplo, `slides` del layout manual de HTML Maker no se pierde al guardar.
+- **Se conservan las claves desconocidas** del nivel superior, de `en` y de `meta`. `slides` y `en.slides` se conservan si su firma coincide; si no, se regeneran al guardar (ver «`slides`»).
 - Se aceptan tres formatos:
   - un HTML con `#cv-data`;
   - un JSON suelto, que puede venir rodeado de texto o de vallas ```` ``` ```` como en las respuestas de Copilot;
@@ -88,4 +112,6 @@ Las listas sugeridas son provisionales y están en `CATEGORIAS`, `OFICINAS` y `A
   1. Prueba 1 columna a 16 px.
   2. Si no cabe, prueba 2 columnas, de 16 px a 12 px en pasos de 0,5 px.
   3. Si tampoco cabe a 12 px, se marca `data-ajuste="no"` y el editor avisa.
+- El texto mide 1140 px de ancho (dos columnas de 538 px con 64 px entre ellas), con el interlineado 1,566 (el «1,15» de HTML Maker) y las negritas del color del párrafo, como HTML Maker en slides.
+- La línea entre columnas empieza 10 px por encima del texto y acaba 10 px por debajo de la columna más alta.
 - La versión EN usa los títulos *Experience* y *Education:* y el copyright en inglés.

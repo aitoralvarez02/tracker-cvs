@@ -208,9 +208,9 @@
       case 'foto-quita': S.data.foto = ''; pintarPanel(); cambio(); break;
       case 'guardar': guardar(); break;
       case 'guardar-como': guardar(true); break;
-      case 'descargar': K.descargar(buildHtml(), nombreSugerido()); toast('Copia descargada.'); break;
+      case 'descargar': datosGuardar().then(o => { K.descargar(buildHtml(o), nombreSugerido()); toast('Copia descargada.'); }); break;
       case 'imprimir': K.imprimirCV(S.data, S.lang); break;
-      case 'json': K.descargar(JSON.stringify(K.clean(S.data), null, 1), nombreSugerido().replace(/\.html$/, '.json'), 'application/json;charset=utf-8'); break;
+      case 'json': datosGuardar().then(o => K.descargar(JSON.stringify(o, null, 1), nombreSugerido().replace(/\.html$/, '.json'), 'application/json;charset=utf-8')); break;
       case 'abrir': abrirArchivo(); break;
       case 'tema': K.tema.alternar(); break;
       case 'nuevo': nuevoCV(); break;
@@ -307,11 +307,21 @@
     const partes = (S.data.nombre || '').normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^A-Za-z0-9]+/).filter(Boolean).map(p => p[0].toUpperCase() + p.slice(1));
     return 'CV_' + (partes.join('_') || 'Nuevo') + '.html';
   }
-  function buildHtml() {
+  /* Datos tal como se guardan: limpios (clean) y con el «slides» de HTML Maker conservado o regenerado (prepararSlides).
+     El slides resultante se queda también en S.data para que el siguiente guardado parta de él. */
+  async function datosGuardar() {
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    const o = K.clean(S.data);
+    K.prepararSlides(o);
+    if (o.slides) S.data.slides = o.slides;
+    if (o.en && o.en.slides) S.data.en.slides = o.en.slides; else delete S.data.en.slides;
+    return o;
+  }
+  function buildHtml(o) {
     const c = document.documentElement.cloneNode(true);
     c.querySelectorAll('[data-dinamico]').forEach(n => { n.innerHTML = ''; });
     c.removeAttribute('data-tema'); c.removeAttribute('style'); const b = c.querySelector('body'); b.removeAttribute('class'); b.removeAttribute('style');
-    c.querySelector('#cv-data').textContent = '\n' + JSON.stringify(K.clean(S.data), null, 1).replace(/</g, '\\u003c') + '\n';
+    c.querySelector('#cv-data').textContent = '\n' + JSON.stringify(o, null, 1).replace(/</g, '\\u003c') + '\n';
     c.querySelector('title').textContent = (S.data.nombre ? 'CV · ' + S.data.nombre : 'CV Maker') + ' | KPMG';
     return '<!DOCTYPE html>\n' + c.outerHTML;
   }
@@ -322,7 +332,7 @@
     const malos = [['linkedin', 'LinkedIn'], ['tendencias', 'KPMG Tendencias']].filter(([k]) => S.data[k].trim() && !K.urlOk(S.data[k].trim()));
     if (malos.length) { malos.forEach(([k]) => { S.data[k] = ''; }); pintarPanel(); S.ctl.pintar(S.data, S.lang); toast('El enlace de ' + malos.map(m => m[1]).join(' y ') + ' no es válido (debe empezar por https:// y no llevar espacios ni comillas): se ha quitado.', 'error'); }
     const nombre = nombreSugerido();
-    const r = await K.guardar(nombre, buildHtml(), { key: 'cv-maker', id: 'cv-maker', asa: como ? null : S.asa });
+    const r = await K.guardar(nombre, buildHtml(await datosGuardar()), { key: 'cv-maker', id: 'cv-maker', asa: como ? null : S.asa });
     if (!r.ok) return;
     S.sucio = false; S.guardadoEn = new Date(); S.asa = r.asa || null; S.nombreArchivo = r.nombre; try { localStorage.removeItem('cvmaker-borrador'); } catch (e) { }
     const pend = K.completitud(S.data); pintarEstado();

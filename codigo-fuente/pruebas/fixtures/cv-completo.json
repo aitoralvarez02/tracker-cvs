@@ -13,6 +13,6 @@
   { "tipo": "lista", "items": ["2019-2022 — Banco A: revisión SOx", "2022-2024 — Aseguradora B: mapa de riesgos"] }
  ],
  "en": { "cargo": "Governance, Risk & Compliance Manager", "empresa": "", "insights": [], "formacion": [], "parrafo_azul": "", "cuerpo": [] },
- "slides": { "layout": "manual", "paginas": [1, 2] },
+ "otra_clave": { "de": "otra herramienta", "n": [1, 2] },
  "meta": { "categoria": "Manager", "oficina": "Madrid", "areas": ["Compliance"], "actualizado": "2025-01-01", "extra": "se conserva" }
 }

@@ -19,6 +19,7 @@ codigo-fuente/
   src/cv-hub/            vacío: el futuro código del Hub irá aquí
   build.js               genera entregable-final/cv-maker.html
   pruebas/               Playwright (pruebas/fixtures: CVs de prueba)
+  herramientas/          comparar-html-maker.js: compara el CV Maker con la ventana «Ver CV completo» de HTML Maker
   maqueta-cv-hub/        fuente del Hub congelado: visor.*, build-original.py (no tocar)
   package.json, package-lock.json, playwright.config.js (node_modules/ y test-results/ se ignoran)
 assets/                  fuentes/open-sans-latin.woff2, logo/Logo_KPMG.png (se inlinan en el build), datos-prueba/muestras-cvs.json (25 CVs en formato HTML Maker)

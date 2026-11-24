@@ -215,32 +215,42 @@
       '<div class="cv-links" data-campo="links">' + links + '</div></div>' +
       '<div class="cv-formacion" data-campo="formacion"><p class="cv-formacion-t">' + L.form + '</p><ul class="cv-formacion-l">' + form + '</ul></div></aside>' +
       '<section class="cv-main"><div class="cv-fijo"><h2>' + L.cv + '</h2><h3>' + L.exp + '</h3></div>' +
-      '<div class="cv-zona"><div class="cv-texto" data-campo="exp">' + expHtml(d) + '</div></div>' +
+      '<div class="cv-zona"><div class="cv-texto" data-campo="exp">' + expHtml(d) + '</div><div class="cv-linea" hidden></div></div>' +
       '<div class="cv-pie"><img src="' + (g.__LOGO__ || '') + '" alt="KPMG"><span>' + esc(COPY[lang === 'en' ? 'en' : 'es']) + '</span></div></section>';
   }
-  function expHtml(d) {
-    let h = '';
-    const P = (c, t) => '<p class="cv-p' + c + '">' + t + '</p>';
+  /* Piezas de la experiencia, en el orden de experienciaInicial de HTML Maker (cv-equipo.js). Cada pieza es un párrafo:
+     k = azul | azul-punto | p | intro | punto; html = texto ya escapado (solo **negrita**). */
+  function expPiezas(d) {
+    const out = [];
     (d.parrafo_azul ? d.parrafo_azul.split(/\n\s*\n/) : []).forEach((p, i) => {
       const t = p.trim(); if (!t) return;
-      if (/^-\s+/.test(t)) h += P(' cv-p--azul cv-p--punto', bold(t.replace(/^-\s+/, '')));
-      else h += P(' cv-p--azul', i === 0 ? '<strong>' + bold(t) + '</strong>' : bold(t));
+      if (/^-\s+/.test(t)) out.push({ k: 'azul-punto', html: bold(t.replace(/^-\s+/, '')) });
+      else out.push({ k: 'azul', html: i === 0 ? '<strong>' + bold(t) + '</strong>' : bold(t) });
     });
     const c = d.cuerpo || [];
     c.forEach((b, i) => {
       const sigueLista = c[i + 1] && (c[i + 1].tipo === 'lista' || c[i + 1].tipo === 'bullet');
-      if (b.tipo === 'parrafo' || b.tipo === 'intro_lista') { if (!(b.texto || '').trim()) return; h += P(sigueLista ? ' cv-p--intro' : '', sigueLista ? '<strong>' + bold(b.texto) + '</strong>' : bold(b.texto)); }
-      else if (b.tipo === 'bullet') { if ((b.texto || '').trim()) h += P(' cv-p--punto', bold(b.texto)); }
-      else if (b.tipo === 'lista') (b.items || []).forEach(it => { if (it.trim()) h += P(' cv-p--punto', bold(it)); });
+      if (b.tipo === 'parrafo' || b.tipo === 'intro_lista') { if ((b.texto || '').trim()) out.push(sigueLista ? { k: 'intro', html: '<strong>' + bold(b.texto) + '</strong>' } : { k: 'p', html: bold(b.texto) }); }
+      else if (b.tipo === 'bullet') { if ((b.texto || '').trim()) out.push({ k: 'punto', html: bold(b.texto) }); }
+      else if (b.tipo === 'lista') (b.items || []).forEach(it => { if (it.trim()) out.push({ k: 'punto', html: bold(it) }); });
     });
-    return h;
+    return out;
   }
-  /* Ajuste automático como HTML Maker: 1 columna a 16 px; si no cabe, 2 columnas; si no, letra menor (hasta 12 px). */
+  const CLASE_CV = { azul: ' cv-p--azul', 'azul-punto': ' cv-p--azul cv-p--punto', p: '', intro: ' cv-p--intro', punto: ' cv-p--punto' };
+  function expHtml(d) {
+    return expPiezas(d).map((p, i) => '<p class="cv-p' + CLASE_CV[p.k] + '" data-i="' + i + '">' + p.html + '</p>').join('');
+  }
+  /* Medidas del layout de HTML Maker (cv-equipo.js / cv-equipo.css, modo slides), comprobadas en su editor:
+     zona de 1144 px de ancho; un bloque de 1140 px o dos de 538 px separados 64 px; línea vertical de 16 px de caja en x = 562. */
+  const HM = { ancho: 1140, col: 538, hueco: 64, lineaX: 562, lineaFuera: 10, formTop: 388 };
+  /* Ajuste automático como HTML Maker: 1 columna a 16 px; si no cabe, 2 columnas; si no, letra menor (hasta 12 px).
+     Devuelve también cómo ha quedado: qué párrafos van en cada columna y su alto (para la línea y para «slides»). */
   function ajustar(cv) {
     const side = $('.cv-formacion', cv), per = $('.cv-persona', cv), lst = $('.cv-formacion-l', cv);
-    side.style.top = Math.max(388, per.offsetTop + per.offsetHeight + 28) + 'px';
-    let fs = 16; lst.style.fontSize = fs + 'px';
-    while (fs > 11 && side.offsetTop + side.offsetHeight > 872) { fs -= 0.5; lst.style.fontSize = fs + 'px'; }
+    const formTop = Math.max(HM.formTop, per.offsetTop + per.offsetHeight + 28);
+    side.style.top = formTop + 'px';
+    let ffs = 16; lst.style.fontSize = ffs + 'px';
+    while (ffs > 11 && side.offsetTop + side.offsetHeight > 872) { ffs -= 0.5; lst.style.fontSize = ffs + 'px'; }
     const z = $('.cv-zona', cv), t = $('.cv-texto', cv);
     const cabe = () => t.scrollHeight <= z.clientHeight + 1 && t.scrollWidth <= t.clientWidth + 1;
     const cand = [[1, 16]]; for (let s = 16; s >= 12; s -= 0.5) cand.push([2, s]);
@@ -251,6 +261,22 @@
     }
     if (!res) res = { cols: 2, fs: 12, ok: false };
     cv.dataset.cols = res.cols; cv.dataset.ajuste = res.ok ? 'si' : 'no';
+    /* Columnas y altos reales (en px del lienzo, aunque esté escalado). */
+    const esc = (cv.getBoundingClientRect().width / 1600) || 1, tr = t.getBoundingClientRect();
+    const columnas = [{ ps: [], h: 0 }, { ps: [], h: 0 }];
+    $$('.cv-p', t).forEach(p => {
+      const r = p.getBoundingClientRect(), col = (res.cols === 2 && (r.left - tr.left) / esc > HM.col + HM.hueco / 2) ? 1 : 0;
+      columnas[col].ps.push(p); columnas[col].h = Math.max(columnas[col].h, (r.bottom - tr.top) / esc);
+    });
+    res.columnas = res.cols === 2 ? columnas.filter(c => c.ps.length) : [columnas[0]];
+    res.zonaH = z.clientHeight; res.formTop = formTop; res.formFs = ffs;
+    /* Línea entre columnas: empieza 10 px por encima del texto y acaba 10 px por debajo de su última línea, como en HTML Maker. */
+    const linea = $('.cv-linea', cv);
+    if (linea) {
+      const alto = Math.max.apply(null, res.columnas.map(c => c.h));
+      linea.hidden = res.cols !== 2;
+      linea.style.top = -HM.lineaFuera + 'px'; linea.style.height = Math.ceil(alto) + 2 * HM.lineaFuera + 'px';
+    }
     return res;
   }
   /* Monta el CV dentro de «box» escalado para caber (con margen). Devuelve un controlador. */
@@ -282,6 +308,73 @@
     pintar();
     if (D.fonts && D.fonts.ready) D.fonts.ready.then(() => { if (D.body.contains(cv)) pintar(); });
     return ctl;
+  }
+  /* ---------- «slides» de HTML Maker (layout del modo slides de «Ver CV completo») ----------
+     HTML Maker (cv-equipo.js) usa data.slides (o data.en.slides) si su «base» es la firma del texto actual; si no,
+     rehace solo el 1.er bloque y deja los demás, con lo que el texto saldría repetido. Por eso, al guardar:
+     firma igual, se conserva tal cual (layout manual); si no, se regenera como lo pinta el CV Maker. */
+  function firma(valor) {
+    const s = JSON.stringify(valor); let h = 5381;
+    for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+    return (h >>> 0).toString(36) + '.' + s.length;
+  }
+  const firmaExperiencia = d => firma([d.parrafo_azul || '', d.cuerpo || []]);
+  const firmaFormacion = d => firma(d.formacion || []);
+  const VIN = ' data-vin="flecha" style="--vin-c: #00338D;"';
+  const CLASE_HM = { azul: 'cv-exp-p cv-exp-p--azul', 'azul-punto': 'cv-exp-p cv-exp-p--azul cv-exp-p--punto txt-vin', p: 'cv-exp-p', intro: 'cv-exp-p', punto: 'cv-exp-p cv-exp-p--punto txt-vin' };
+  /* Interlineado «1,15» de HTML Maker (1,362 × 1,15): el mismo que usa el lienzo del CV Maker (cv.css). */
+  const INTER_HM = '1.15';
+  /* Pinta el CV fuera de la pantalla, sin escalar, y devuelve el «slides» equivalente para un idioma. */
+  function generarSlides(data, lang) {
+    const host = D.createElement('div');
+    host.setAttribute('aria-hidden', 'true');
+    host.style.cssText = 'position:fixed;left:-20000px;top:0;width:1600px;height:900px;visibility:hidden;pointer-events:none;';
+    const cv = D.createElement('div'); cv.className = 'cv-lienzo'; cv.lang = lang; host.appendChild(cv); D.body.appendChild(host);
+    try {
+      cv.innerHTML = cvHtml(data, lang, LABELS[lang === 'en' ? 'en' : 'es']);
+      const r = ajustar(cv), d = pick(data, lang), piezas = expPiezas(d);
+      const attrs = { 'data-fmt-inter': INTER_HM };
+      if (r.fs < 16) { attrs['data-hero-tam'] = String(r.fs); attrs.style = '--hero-n: ' + r.fs + ';'; }
+      const bloques = r.columnas.map((c, n) => ({
+        html: c.ps.map((p, j) => {
+          const pz = piezas[+p.dataset.i], punto = /punto/.test(pz.k);
+          let at = '';
+          if (punto) at = (n > 0 && j === 0) ? ' data-vin="flecha" style="--vin-arriba: 0px; --vin-c: #00338D;"' : VIN;
+          else if (j < c.ps.length - 1) { const mb = Math.round(parseFloat(getComputedStyle(p).marginBottom) || 0); if (mb) at = ' style="--fmt-despues: ' + mb + 'px;"'; }
+          return '<p class="' + CLASE_HM[pz.k] + '"' + at + '>' + pz.html + '</p>';
+        }).join(''),
+        attrs: Object.assign({}, attrs),
+        x: n * (HM.col + HM.hueco), y: 0,
+        w: r.cols === 2 ? HM.col : HM.ancho,
+        h: r.cols === 2 ? Math.ceil(c.h) : Math.round(r.zonaH)
+      }));
+      const alto = Math.max.apply(null, r.columnas.map(c => Math.ceil(c.h)));
+      const s = { base: firmaExperiencia(d), bloques, lineas: r.cols === 2 ? [{ dir: 'v', x: HM.lineaX, y: -HM.lineaFuera, l: alto + 2 * HM.lineaFuera }] : [] };
+      if (r.formFs < 16) s.formacion = { base: firmaFormacion(d), html: d.formacion.map(f => '<li>' + esc(f) + '</li>').join(''), attrs: { 'data-hero-tam': String(r.formFs), style: '--hero-n: ' + r.formFs + ';' } };
+      if (r.formTop !== HM.formTop) s.columna = { formacion: Math.round(r.formTop) };
+      return s;
+    } finally { host.remove(); }
+  }
+  /* Pone en «o» (datos ya limpios con clean) el slides de ES y, si hay experiencia EN propia, el de EN.
+     Devuelve qué ha hecho en cada idioma: 'conservado' | 'regenerado' | 'quitado' | ''. */
+  function prepararSlides(o) {
+    const hecho = { es: '', en: '' };
+    const valido = s => s && typeof s === 'object' && !Array.isArray(s);
+    if (valido(o.slides) && o.slides.base === firmaExperiencia(o)) hecho.es = 'conservado';
+    else { o.slides = generarSlides(o, 'es'); hecho.es = 'regenerado'; }
+    const en = o.en;
+    if (en) {
+      const propia = !vacio(en.parrafo_azul) || !vacio(en.cuerpo), dEn = pick(o, 'en');
+      if (propia) {
+        if (valido(en.slides) && en.slides.base === firmaExperiencia(dEn)) hecho.en = 'conservado';
+        else { en.slides = generarSlides(o, 'en'); hecho.en = 'regenerado'; }
+      } else if ('slides' in en && !(valido(en.slides) && en.slides.base === firmaExperiencia(dEn))) {
+        /* Sin experiencia EN propia, HTML Maker usa el slides español; uno inglés que ya no casa repetiría texto. */
+        delete en.slides; hecho.en = 'quitado';
+        if (!Object.keys(en).length) delete o.en;
+      }
+    }
+    return hecho;
   }
   function imprimirCV(data, lang) {
     const host = D.createElement('div'); host.id = 'cv-impresion'; D.body.appendChild(host);
@@ -430,7 +523,7 @@
     $, $$, esc, bold, norm, slug, vacio, hoy, SCHEMA, CAMPOS_EN, CATEGORIAS, OFICINAS, AREAS, LABELS, FOTO_GENERICA,
     emptyCV, normalize, clean, pick, tieneEN, urlOk, fotoOk, vacioTotal, comprobar, completitud,
     inferCategoria, inferOficina, ordenCat, derivados, mesesDesde, fechaLarga, textoCompleto,
-    extraerJsonDeHtml, jsonDeTexto, leerCVs, montarCV, imprimirCV, procesarFoto, IDB, descargar, guardar, abrir, leerTexto,
+    extraerJsonDeHtml, jsonDeTexto, leerCVs, expPiezas, firma, firmaExperiencia, firmaFormacion, generarSlides, prepararSlides, montarCV, imprimirCV, procesarFoto, IDB, descargar, guardar, abrir, leerTexto,
     toast, dialogo, confirmar, tema, debounce
   };
 }(window));

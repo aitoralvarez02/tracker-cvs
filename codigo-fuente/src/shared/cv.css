@@ -27,15 +27,20 @@
 .cv-fijo h2 { font-size: 44px; font-weight: 700; color: #00338D; margin: 0; padding-bottom: 10px; border-bottom: 3px solid #4A8FDB; text-align: justify; line-height: 1.2; }
 .cv-fijo h3 { font-size: 26px; font-weight: 700; color: #00205B; margin: 24px 0 14px; line-height: 1.2; }
 .cv-zona { flex: 1; min-height: 0; position: relative; margin: 6px 56px 16px 60px; }
-.cv-texto { position: absolute; inset: 0; font-size: 16px; line-height: 1.6; text-align: justify; color: #2D2D2D; column-count: var(--cols, 1); column-gap: 64px; column-rule: 2px solid #B7CBEA; }
-.cv-texto strong { color: #141A59; font-weight: 700; }
+/* Ancho 1140 px (zona de 1144 menos 4), como los bloques de HTML Maker: 1 bloque de 1140 o 2 de 538 con 64 entre ellos.
+   Interlineado «1,15» de HTML Maker en slides (1,362 × 1,15), en párrafos y viñetas; las negritas heredan el color. */
+.cv-texto { position: absolute; inset: 0 4px 0 0; font-size: 16px; line-height: calc(1.362 * 1.15); text-align: justify; color: #2D2D2D; column-count: var(--cols, 1); column-gap: 64px; }
+.cv-texto strong { color: inherit; font-weight: 700; }
+/* Línea entre columnas: la coloca ajustar() 10 px por encima y por debajo del texto (como .cv-exp-linea de HTML Maker). */
+.cv-linea { position: absolute; left: 562px; width: 16px; pointer-events: none; }
+.cv-linea::before { content: ""; position: absolute; top: 0; bottom: 0; left: 7px; width: 2px; background: #B7CBEA; }
 .cv-p { margin: 0 0 16px; break-inside: avoid; }
 .cv-p:last-child { margin-bottom: 0; }
 .cv-p--azul, .cv-p--azul strong { color: #00338D; }
 .cv-p--azul:has(+ .cv-p:not(.cv-p--azul)) { margin-bottom: 26px; }
 .cv-p--intro { break-after: avoid; }
 /* viñeta «flecha» de HTML Maker (txt-vin) */
-.cv-p--punto { position: relative; margin: 4px 0 0; padding-left: calc(12px + 1.25em); line-height: 1.45; }
+.cv-p--punto { position: relative; margin: 4px 0 0; padding-left: calc(12px + 1.25em); }
 .cv-p--punto:not(.cv-p--punto + .cv-p--punto) { margin-top: 24px; }
 .cv-p--punto:not(:has(+ .cv-p--punto)) { margin-bottom: 20px; }
 .cv-p:not(.cv-p--punto):has(+ .cv-p--punto) { margin-bottom: 0; }

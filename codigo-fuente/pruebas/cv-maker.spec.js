@@ -74,7 +74,7 @@ test('guardar: nombre estable, claves desconocidas conservadas y EN vacíos elim
   const g = await guardar(page);
   expect(g.nombre).toBe('CV_Ana_Prueba_Nunez.html');
   const d = datosDe(g.texto);
-  expect(d.slides).toEqual({ layout: 'manual', paginas: [1, 2] });
+  expect(d.otra_clave).toEqual({ de: 'otra herramienta', n: [1, 2] });
   expect(d.en).toEqual({ cargo: 'Governance, Risk & Compliance Manager' });
   expect(d.meta).toEqual({ extra: 'se conserva', schema: 1, categoria: 'Manager', oficina: 'Madrid', areas: ['Compliance'], actualizado: hoy() });
   expect(g.texto).not.toMatch(/<html[^>]*data-tema/);
@@ -138,7 +138,7 @@ test('seguridad: urlOk rechaza enlaces que podrían inyectar atributos en HTML M
 test('ajuste automático: texto largo pasa a 2 columnas y letra menor', async ({ page }) => {
   await abrirEditor(page);
   const largo = JSON.parse(fs.readFileSync(FIX('cv-completo.json'), 'utf8'));
-  largo.cuerpo = [{ tipo: 'lista', items: Array.from({ length: 30 }, (_, i) => 'Proyecto ' + i + ' — cliente del sector financiero: revisión del modelo de control interno y pruebas de diseño y eficacia.') }];
+  largo.cuerpo = [{ tipo: 'lista', items: Array.from({ length: 24 }, (_, i) => 'Proyecto ' + i + ' — cliente del sector financiero: revisión del modelo de control interno y pruebas de diseño y eficacia.') }];
   const ruta = test.info().outputPath('largo.json');
   fs.writeFileSync(ruta, JSON.stringify(largo));
   await abrirCV(page, ruta);
@@ -187,4 +187,125 @@ test('no guarda sin nombre', async ({ page }) => {
   await expect(page.locator('.toast--error')).toContainText('Escribe tu nombre');
   await expect(page.locator('#panel [data-k="nombre"]')).toBeFocused();
   expect(descargas).toBe(0);
+});
+
+/* ---------- «slides» de HTML Maker (contexto/contrato-datos.md, «slides») ---------- */
+/* Firma de HTML Maker (cv-equipo.js, firma/firmaExperiencia), copiada aquí para comprobar la del CV Maker. */
+function firmaHM(v) { const s = JSON.stringify(v); let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36) + '.' + s.length; }
+const firmaExpHM = d => firmaHM([d.parrafo_azul || '', d.cuerpo || []]);
+const MUESTRAS = path.join(RAIZ, 'assets', 'datos-prueba', 'muestras-cvs.json');
+const muestra = patron => { const m = JSON.parse(fs.readFileSync(MUESTRAS, 'utf8')); return JSON.parse(JSON.stringify((Array.isArray(m) ? m : m.cvs).find(c => patron.test(c.nombre)))); };
+const textoDe = html => html.replace(/<[^>]+>/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+async function abrirJson(page, obj, nombre) {
+  const ruta = test.info().outputPath(nombre || 'cv.json');
+  fs.writeFileSync(ruta, JSON.stringify(obj));
+  await abrirCV(page, ruta);
+}
+
+test('slides: un CV de 1 columna guarda 1 bloque que ocupa la zona, con la firma de HTML Maker', async ({ page }) => {
+  await abrirEditor(page);
+  await abrirCV(page, FIX('cv-completo.json'));
+  const d = datosDe((await guardar(page)).texto);
+  expect(d.slides.base).toBe(firmaExpHM(d));
+  expect(d.slides.lineas).toEqual([]);
+  expect(d.slides.bloques).toHaveLength(1);
+  const b = d.slides.bloques[0];
+  expect([b.x, b.y, b.w]).toEqual([0, 0, 1140]);
+  expect(b.h).toBeGreaterThan(630); expect(b.h).toBeLessThan(650);
+  expect(b.attrs).toEqual({ 'data-fmt-inter': '1.15' });
+  expect(b.html).toContain('<p class="cv-exp-p cv-exp-p--azul" style="--fmt-despues: 26px;"><strong>Manager con experiencia en <strong>control interno</strong> y cumplimiento.</strong></p>');
+  expect(b.html).toContain('<p class="cv-exp-p cv-exp-p--punto txt-vin" data-vin="flecha" style="--vin-c: #00338D;">2019-2022 — Banco A: revisión SOx</p>');
+  expect(d.slides.columna).toBeUndefined();
+  expect(d.slides.formacion).toBeUndefined();
+  expect(d.en.slides).toBeUndefined(); // sin experiencia EN propia, HTML Maker usa el slides español
+});
+
+test('slides: si la firma coincide se conserva tal cual (layout manual de HTML Maker, ES y EN)', async ({ page }) => {
+  await abrirEditor(page);
+  const cv = muestra(/Melero/);
+  expect(cv.slides.base).toBe(firmaExpHM(cv));
+  await abrirJson(page, cv, 'melero.json');
+  const d = datosDe((await guardar(page)).texto);
+  expect(d.slides).toEqual(cv.slides);
+  expect(d.en.slides).toEqual(cv.en.slides);
+});
+
+test('slides: si el texto cambia se regenera en 2 bloques de 538 px con línea, sin texto repetido ni escapes rotos', async ({ page }) => {
+  await abrirEditor(page);
+  const cv = muestra(/Melero/);
+  cv.cuerpo[1].items[0] = 'Proyecto con <b onclick="x()">etiquetas</b> & "comillas" ' + cv.cuerpo[1].items[0];
+  await abrirJson(page, cv, 'melero-cambiado.json');
+  const g = await guardar(page);
+  const d = datosDe(g.texto);
+  const s = d.slides;
+  expect(s.base).toBe(firmaExpHM(d));
+  expect(s.bloques.map(b => [b.x, b.y, b.w])).toEqual([[0, 0, 538], [602, 0, 538]]);
+  const alto = Math.max(...s.bloques.map(b => b.h));
+  expect(s.lineas).toEqual([{ dir: 'v', x: 562, y: -10, l: alto + 20 }]);
+  for (const b of s.bloques) { expect(b.h).toBeLessThanOrEqual(645); expect(b.attrs['data-fmt-inter']).toBe('1.15'); }
+  // el tamaño de letra del CV Maker pasa a HTML Maker
+  const fs2 = await page.locator('#cvbox .cv-texto').evaluate(e => parseFloat(e.style.fontSize));
+  if (fs2 < 16) expect(s.bloques[0].attrs).toMatchObject({ 'data-hero-tam': String(fs2), style: '--hero-n: ' + fs2 + ';' });
+  else expect(s.bloques[0].attrs['data-hero-tam']).toBeUndefined();
+  // todo el texto una sola vez y en orden
+  const esperado = [d.parrafo_azul, ...d.cuerpo.flatMap(b => b.items || [b.texto])].map(t => t.replace(/\*\*/g, '')).join(' ').replace(/\s+/g, ' ');
+  expect(textoDe(s.bloques.map(b => b.html).join(' '))).toBe(esperado);
+  // HTML escapado: ninguna etiqueta que no sea p/strong
+  const html = s.bloques.map(b => b.html).join('');
+  expect(html.match(/<\/?([a-z]+)/g).filter(t => !/^<\/?(p|strong)$/.test(t))).toEqual([]);
+  expect(html).toContain('&lt;b onclick=&quot;x()&quot;&gt;etiquetas&lt;/b&gt; &amp; &quot;comillas&quot;');
+  // la columna derecha no empieza con la 1.ª viñeta separada de su frase de presentación
+  const der = s.bloques[1].html;
+  expect(der).toMatch(/^<p class="cv-exp-p cv-exp-p--punto txt-vin" data-vin="flecha" style="--vin-arriba: 0px; --vin-c: #00338D;">|^<p class="cv-exp-p"/);
+  expect(s.bloques[0].html).not.toMatch(/<p class="cv-exp-p"[^>]*><strong>[^<]*:<\/strong><\/p>$/);
+  // EN: tiene experiencia propia y su texto no cambió, así que su slides se conserva
+  expect(d.en.slides).toEqual(cv.en.slides);
+  // y vuelve a guardarse igual (idempotente)
+  const d2 = datosDe((await guardar(page)).texto);
+  expect(d2.slides).toEqual(s);
+});
+
+test('slides EN: se regenera solo con experiencia EN propia; sin ella se quita uno que ya no casa', async ({ page }) => {
+  await abrirEditor(page);
+  const cv = muestra(/Melero/);
+  cv.en.parrafo_azul = 'Changed intro.';
+  await abrirJson(page, cv, 'melero-en.json');
+  let d = datosDe((await guardar(page)).texto);
+  expect(d.en.slides.base).toBe(firmaExpHM(Object.assign({}, d, { parrafo_azul: d.en.parrafo_azul, cuerpo: d.en.cuerpo })));
+  expect(d.en.slides.bloques[0].html).toMatch(/^<p class="cv-exp-p cv-exp-p--azul"[^>]*><strong>Changed intro\.<\/strong><\/p>/);
+  expect(d.slides).toEqual(cv.slides);
+
+  const sinEn = muestra(/Melero/);
+  delete sinEn.en.parrafo_azul; delete sinEn.en.cuerpo;
+  const p2 = await page.context().newPage();
+  await abrirEditor(p2);
+  await abrirJson(p2, sinEn, 'melero-sin-en.json');
+  d = datosDe((await guardar(p2)).texto);
+  expect(d.en.slides).toBeUndefined();
+  expect(d.en.cargo).toBe(sinEn.en.cargo);
+});
+
+test('slides: la columna azul se regenera como la pinta el CV Maker (posición y letra de la formación)', async ({ page }) => {
+  await abrirEditor(page);
+  const cv = muestra(/Tuir/);
+  delete cv.slides; delete cv.en.slides;
+  await abrirJson(page, cv, 'tuiran.json');
+  const d = datosDe((await guardar(page)).texto);
+  // en español la formación cabe a 16 px y en su sitio: sin formacion ni columna
+  expect(d.slides.formacion).toBeUndefined();
+  expect(d.slides.columna).toBeUndefined();
+  // en inglés no cabe a 16 px: HTML Maker recibe la letra que usa el CV Maker
+  const f = d.en.slides.formacion;
+  expect(f.attrs).toEqual({ 'data-hero-tam': '15.5', style: '--hero-n: 15.5;' });
+  expect(f.base).toBe(firmaHM(d.en.formacion));
+  expect(f.html).toBe(d.en.formacion.map(x => '<li>' + x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') + '</li>').join(''));
+
+  const am = muestra(/Valcarce/);
+  delete am.slides; if (am.en) delete am.en.slides;
+  const p2 = await page.context().newPage();
+  await abrirEditor(p2);
+  await abrirJson(p2, am, 'valcarce.json');
+  const top = await p2.locator('#cvbox .cv-formacion').evaluate(e => e.offsetTop);
+  expect(top).toBeGreaterThan(388);
+  expect(datosDe((await guardar(p2)).texto).slides.columna).toEqual({ formacion: top });
 });
