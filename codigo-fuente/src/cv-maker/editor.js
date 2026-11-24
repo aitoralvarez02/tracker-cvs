@@ -455,7 +455,11 @@
           if (imp) {
             if (!K.vacioTotal(S.data) && !(await K.confirmar('Sustituir contenido', 'Los textos actuales se sustituirán por los importados (la foto y los datos del visor se conservan). ¿Continuar?', 'Sustituir', true))) return false;
             aplicarImportacion(obj);
-          } else aplicarTraduccion(obj);
+          } else {
+            const tr = leerTraduccion(obj), dif = difEstructura(tr);
+            if (dif.length && !(await confirmarEstructura(dif))) return false;
+            aplicarTraduccion(tr);
+          }
         } catch (e) { err.textContent = 'No se ha podido leer la respuesta: ' + e.message; err.hidden = false; return false; }
       } }] });
   }
@@ -466,10 +470,37 @@
     S.sucio = true; S.modo = 'editar'; aplicarModo(); refrescarTodo();
     const c = K.completitud(S.data); toast('CV importado. Revisa el contenido (' + c.hechos + '/' + c.total + ' completado).', 'ok');
   }
-  function aplicarTraduccion(obj) {
+  /* Traducción pegada: {en: {...}} o directamente {...}. Devuelve {en (lo recibido), n (normalizado)}. */
+  function leerTraduccion(obj) {
     const en = (obj && obj.en && typeof obj.en === 'object') ? obj.en : obj;
-    if (!en || typeof en !== 'object' || !K.CAMPOS_EN.some(k => k in en)) throw new Error('No se encuentran campos traducidos (cargo, parrafo_azul, cuerpo…).');
-    const n = K.normalize({ en }).en; K.CAMPOS_EN.forEach(k => { if (k in en) S.data.en[k] = n[k]; });
+    if (!en || typeof en !== 'object' || Array.isArray(en) || !K.CAMPOS_EN.some(k => k in en)) throw new Error('No se encuentran campos traducidos (cargo, parrafo_azul, cuerpo…).');
+    return { en, n: K.normalize({ en }).en };
+  }
+  /* Compara los bloques de cuerpo de la traducción con los del español: número, tipo y viñetas de cada lista. */
+  const NOMBRE_TIPO = { parrafo: 'párrafo', intro_lista: 'frase que introduce una lista', lista: 'lista', bullet: 'viñeta' };
+  function difEstructura(tr) {
+    if (!('cuerpo' in tr.en)) return [];
+    const limpia = c => K.clean(Object.assign(K.emptyCV(), { cuerpo: c })).cuerpo;
+    const es = limpia(S.data.cuerpo), en = limpia(tr.n.cuerpo), out = [];
+    if (es.length !== en.length) out.push('El español tiene ' + es.length + ' bloque(s) de experiencia y la traducción ' + en.length + '.');
+    for (let i = 0; i < Math.min(es.length, en.length); i++) {
+      if (es[i].tipo !== en[i].tipo) out.push('Bloque ' + (i + 1) + ': «' + NOMBRE_TIPO[es[i].tipo] + '» en español y «' + NOMBRE_TIPO[en[i].tipo] + '» en la traducción.');
+      else if (es[i].tipo === 'lista' && es[i].items.length !== en[i].items.length) out.push('Bloque ' + (i + 1) + ' (lista): ' + es[i].items.length + ' viñeta(s) en español y ' + en[i].items.length + ' en la traducción.');
+    }
+    return out;
+  }
+  function confirmarEstructura(dif) {
+    const lista = dif.slice(0, 6).map(x => '<li>' + esc(x) + '</li>').join('') + (dif.length > 6 ? '<li>… y ' + (dif.length - 6) + ' diferencia(s) más.</li>' : '');
+    return new Promise(res => {
+      let ok = false;
+      K.dialogo({ titulo: 'La traducción no tiene la misma estructura', ancho: 540, alCerrar() { res(ok); },
+        cuerpo: '<p class="dlg-p">La experiencia traducida no coincide bloque a bloque con la española:</p><ul class="dlg-lista">' + lista + '</ul>' +
+          '<p class="dlg-p">Puede faltar texto o haberse unido o partido algún bloque. Revisa la respuesta de Copilot o aplícala y corrígela en la pestaña EN.</p>',
+        botones: [{ texto: 'Revisar la respuesta', clase: 'btn--ghost' }, { texto: 'Aplicar igualmente', clase: 'btn--prim', cb() { ok = true; } }] });
+    });
+  }
+  function aplicarTraduccion(tr) {
+    K.CAMPOS_EN.forEach(k => { if (k in tr.en) S.data.en[k] = tr.n[k]; });
     S.lang = 'en'; S.sucio = true; aplicarModo(); refrescarTodo(); toast('Traducción aplicada. Revísala en la pestaña EN.', 'ok');
   }
 

@@ -543,3 +543,38 @@ test('accesibilidad: contraste AA de textos de ayuda y botones en día y noche',
     for (const [k, v] of Object.entries(r)) expect(v, tema + ' ' + k).toBeGreaterThanOrEqual(4.5);
   }
 });
+
+/* ---------- Copilot: traducción ---------- */
+async function pegarTraduccion(page, en) {
+  await page.locator('#btn-copilot').click();
+  await page.locator('#menu-copilot [data-acc="traducir-copilot"]').click();
+  await expect(page.locator('#cp-prompt')).toHaveValue(/Traduce al inglés/);
+  await page.locator('#cp-resp').fill(JSON.stringify({ en }));
+  await page.getByRole('button', { name: 'Aplicar traducción' }).click();
+}
+test('Copilot: avisa si la traducción no tiene los mismos bloques que el español', async ({ page }) => {
+  await abrirEditor(page);
+  await abrirCV(page, FIX('cv-completo.json'));
+  await pegarTraduccion(page, { parrafo_azul: 'Manager.', cuerpo: [{ tipo: 'parrafo', texto: '**Main projects:**' }, { tipo: 'lista', items: ['2019-2022 — Bank A'] }, { tipo: 'parrafo', texto: 'Extra.' }] });
+  const aviso = page.getByRole('dialog', { name: 'La traducción no tiene la misma estructura' });
+  await expect(aviso).toContainText('El español tiene 2 bloque(s) de experiencia y la traducción 3.');
+  await expect(aviso).toContainText('Bloque 2 (lista): 2 viñeta(s) en español y 1 en la traducción.');
+  await aviso.getByRole('button', { name: 'Revisar la respuesta' }).click();
+  await expect(page.getByRole('dialog', { name: 'Traducir al inglés con Copilot' })).toBeVisible();
+  await expect(page.locator('[data-lang="en"]')).toHaveAttribute('aria-pressed', 'false');
+  // tipo distinto
+  await page.locator('#cp-resp').fill(JSON.stringify({ en: { cuerpo: [{ tipo: 'lista', items: ['a'] }, { tipo: 'lista', items: ['b', 'c'] }] } }));
+  await page.getByRole('button', { name: 'Aplicar traducción' }).click();
+  await expect(aviso).toContainText('Bloque 1: «párrafo» en español y «lista» en la traducción.');
+  await aviso.getByRole('button', { name: 'Aplicar igualmente' }).click();
+  await expect(page.locator('.dlg')).toHaveCount(0);
+  await expect(page.locator('[data-lang="en"]')).toHaveAttribute('aria-pressed', 'true');
+});
+test('Copilot: una traducción con la misma estructura se aplica sin aviso', async ({ page }) => {
+  await abrirEditor(page);
+  await abrirCV(page, FIX('cv-completo.json'));
+  await pegarTraduccion(page, { parrafo_azul: 'Manager.', cuerpo: [{ tipo: 'parrafo', texto: '**Main projects:**' }, { tipo: 'lista', items: ['2019-2022 — Bank A: SOx', '2022-2024 — Insurer B'] }] });
+  await expect(page.locator('.dlg')).toHaveCount(0);
+  await expect(page.locator('#cvbox h3')).toHaveText('Experience');
+  await expect(page.locator('#cvbox .cv-p--punto').first()).toHaveText('2019-2022 — Bank A: SOx');
+});
