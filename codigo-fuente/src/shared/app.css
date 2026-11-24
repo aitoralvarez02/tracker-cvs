@@ -57,8 +57,8 @@ button { cursor: pointer; }
 .btn--ghost { background: transparent; }
 .btn--peligro { background: var(--bad); border-color: var(--bad); color: #fff; }
 /* Contraste AA del texto blanco en noche (los tonos claros de --brand2 y --bad no llegan a 4,5:1). */
-html[data-tema="noche"] .btn--prim { background: #3D5EE8; border-color: #3D5EE8; }
-html[data-tema="noche"] .btn--prim:hover { background: #3352D6; border-color: #3352D6; }
+html[data-tema="noche"] :not(.top) > .btn--prim { background: #3D5EE8; border-color: #3D5EE8; }
+html[data-tema="noche"] :not(.top) > .btn--prim:hover { background: #3352D6; border-color: #3352D6; }
 html[data-tema="noche"] .btn--peligro { background: #C8102E; border-color: #C8102E; }
 .btn--sm { height: 28px; padding: 0 10px; font-size: 12px; border-radius: 7px; }
 .btn--icono { width: 34px; padding: 0; }

@@ -534,7 +534,7 @@ test('accesibilidad: contraste AA de textos de ayuda y botones en día y noche',
       const muestra = sel => { const el = document.querySelector(sel); return el ? ratio(getComputedStyle(el).color, fondo(el)) : null; };
       const prim = document.createElement('button'); prim.className = 'btn btn--prim'; prim.textContent = 'x'; document.querySelector('#panel').appendChild(prim);
       const pel = document.createElement('button'); pel.className = 'btn btn--peligro'; pel.textContent = 'x'; document.querySelector('#panel').appendChild(pel);
-      const out = { ayuda: muestra('#panel .ayuda'), nota: muestra('#panel .campo > span em'), prim: muestra('#panel .btn--prim'), peligro: muestra('#panel .btn--peligro') };
+      const out = { ayuda: muestra('#panel .ayuda'), nota: muestra('#panel .campo > span em'), prim: muestra('#panel .btn--prim'), peligro: muestra('#panel .btn--peligro'), guardar: muestra('header [data-acc="guardar"]') };
       prim.remove(); pel.remove();
       const ph = getComputedStyle(document.querySelector('#panel input[type="text"]'), '::placeholder').color;
       out.placeholder = ratio(ph, fondo(document.querySelector('#panel input[type="text"]')));
