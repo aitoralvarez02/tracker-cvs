@@ -553,9 +553,24 @@
         botones: [{ texto: 'Cancelar', clase: 'btn--ghost' }, { texto: textoOk || 'Aceptar', clase: peligro ? 'btn--peligro' : 'btn--prim', cb() { hecho = true; res(true); } }] });
     });
   }
+  /* Tema día/noche de la interfaz (no del lienzo del CV). Sin preferencia guardada sigue al sistema (prefers-color-scheme),
+     también si cambia con la herramienta abierta; al pulsar el botón se guarda en localStorage y ya manda esa elección. */
   const tema = {
-    init() { let t = 'dia'; try { t = localStorage.getItem('kpmg-cv-tema') || 'dia'; } catch (e) { } D.documentElement.setAttribute('data-tema', t); },
-    alternar() { const t = D.documentElement.getAttribute('data-tema') === 'noche' ? 'dia' : 'noche'; D.documentElement.setAttribute('data-tema', t); try { localStorage.setItem('kpmg-cv-tema', t); } catch (e) { } return t; }
+    _cb: null,
+    guardado() { try { const t = localStorage.getItem('kpmg-cv-tema'); return t === 'dia' || t === 'noche' ? t : null; } catch (e) { return null; } },
+    sistema() { return g.matchMedia && g.matchMedia('(prefers-color-scheme: dark)').matches ? 'noche' : 'dia'; },
+    actual() { return D.documentElement.getAttribute('data-tema') === 'noche' ? 'noche' : 'dia'; },
+    poner(t) { D.documentElement.setAttribute('data-tema', t); if (this._cb) this._cb(t); },
+    init(cb) {
+      this._cb = cb || null;
+      this.poner(this.guardado() || this.sistema());
+      if (g.matchMedia) {
+        const mq = g.matchMedia('(prefers-color-scheme: dark)');
+        const alCambiar = () => { if (!this.guardado()) this.poner(this.sistema()); };
+        if (mq.addEventListener) mq.addEventListener('change', alCambiar); else if (mq.addListener) mq.addListener(alCambiar);
+      }
+    },
+    alternar() { const t = this.actual() === 'noche' ? 'dia' : 'noche'; try { localStorage.setItem('kpmg-cv-tema', t); } catch (e) { } this.poner(t); return t; }
   };
   const debounce = (f, ms) => { let t; return function () { clearTimeout(t); const a = arguments; t = setTimeout(() => f.apply(null, a), ms); }; };
 

@@ -53,7 +53,7 @@
 .cv-lienzo[data-ajuste="no"] .cv-zona { outline: 3px dashed #E0313F; outline-offset: 2px; }
 
 /* resaltado del campo que se está editando */
-.cv-lienzo [data-campo] { transition: outline-color .15s; outline: 3px solid transparent; outline-offset: 6px; border-radius: 4px; }
+.cv-lienzo [data-campo] { outline: 3px solid transparent; outline-offset: 6px; border-radius: 4px; }
 .cv-lienzo[data-foco="nombre"] [data-campo="nombre"], .cv-lienzo[data-foco="cargo"] [data-campo="cargo"], .cv-lienzo[data-foco="empresa"] [data-campo="empresa"],
 .cv-lienzo[data-foco="foto"] [data-campo="foto"], .cv-lienzo[data-foco="links"] [data-campo="links"], .cv-lienzo[data-foco="formacion"] [data-campo="formacion"],
 .cv-lienzo[data-foco="exp"] [data-campo="exp"] { outline-color: #00B8F5; }

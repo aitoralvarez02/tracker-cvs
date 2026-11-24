@@ -160,14 +160,45 @@ test('versión EN: usa los campos traducidos y cae al español en los vacíos', 
   await expect(cv.locator('.cv-p--azul')).toContainText('control interno');
 });
 
-test('tema día/noche: cambia en el editor y no se guarda en el CV', async ({ page }) => {
+test('tema día/noche: botón ☀/☾ en la barra; cambia el editor, no el lienzo, y no se guarda en el CV', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
   await abrirEditor(page);
   await abrirCV(page, FIX('cv-completo.json'));
-  await page.locator('#btn-mas').click();
-  await page.locator('[data-acc="tema"]').click();
+  const b = page.locator('header #btn-tema');
+  await expect(b).toBeVisible();
+  await expect(b).toHaveText('☾');
+  await expect(b).toHaveAttribute('aria-label', 'Cambiar a modo noche');
+  const fondoLienzo = () => page.locator('#cvbox .cv-lienzo').evaluate(e => getComputedStyle(e).backgroundColor + getComputedStyle(e.querySelector('.cv-texto')).color);
+  const antes = await fondoLienzo();
+  await b.click();
   await expect(page.locator('html')).toHaveAttribute('data-tema', 'noche');
+  await expect(b).toHaveText('☀');
+  await expect(b).toHaveAttribute('aria-label', 'Cambiar a modo día');
+  expect(await fondoLienzo()).toBe(antes);
+  expect(await page.evaluate(() => localStorage.getItem('kpmg-cv-tema'))).toBe('noche');
   const g = await guardar(page);
   expect(g.texto).not.toMatch(/<html[^>]*data-tema/);
+});
+
+test('tema: sin preferencia guardada sigue a prefers-color-scheme; con ella, manda la guardada', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await abrirEditor(page);
+  await expect(page.locator('html')).toHaveAttribute('data-tema', 'noche');
+  await page.emulateMedia({ colorScheme: 'light' });
+  await expect(page.locator('html')).toHaveAttribute('data-tema', 'dia');
+  await page.locator('#btn-tema').click();
+  await expect(page.locator('html')).toHaveAttribute('data-tema', 'noche');
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-tema', 'noche');
+});
+
+test('animaciones: con prefers-reduced-motion no hay transiciones ni animaciones', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await abrirEditor(page);
+  await page.locator('#btn-comp').click();
+  const r = await page.evaluate(() => [...document.querySelectorAll('.btn, .dlg, .dlg-fondo, .toast, .sec-f, .seg button')].map(e => { const c = getComputedStyle(e); return [c.transitionDuration, c.animationName]; }));
+  for (const [dur, anim] of r) { expect(dur.split(',').every(d => parseFloat(d) === 0)).toBe(true); expect(anim).toBe('none'); }
 });
 
 test('Copilot: importa el JSON pegado (con vallas de código)', async ({ page }) => {

@@ -175,7 +175,7 @@ textarea { resize: vertical; min-height: 84px; font-family: inherit; }
 .cv-lienzo[data-ajuste="no"] .cv-zona { outline: 3px dashed #E0313F; outline-offset: 2px; }
 
 /* resaltado del campo que se está editando */
-.cv-lienzo [data-campo] { transition: outline-color .15s; outline: 3px solid transparent; outline-offset: 6px; border-radius: 4px; }
+.cv-lienzo [data-campo] { outline: 3px solid transparent; outline-offset: 6px; border-radius: 4px; }
 .cv-lienzo[data-foco="nombre"] [data-campo="nombre"], .cv-lienzo[data-foco="cargo"] [data-campo="cargo"], .cv-lienzo[data-foco="empresa"] [data-campo="empresa"],
 .cv-lienzo[data-foco="foto"] [data-campo="foto"], .cv-lienzo[data-foco="links"] [data-campo="links"], .cv-lienzo[data-foco="formacion"] [data-campo="formacion"],
 .cv-lienzo[data-foco="exp"] [data-campo="exp"] { outline-color: #00B8F5; }
@@ -205,7 +205,7 @@ textarea { resize: vertical; min-height: 84px; font-family: inherit; }
 .sec-cab b { flex: 1; }
 .sec-est { min-width: 22px; height: 22px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; padding: 0 6px; }
 .sec-est--ok { background: var(--ok-bg); color: var(--ok); } .sec-est--pend { background: var(--warn-bg); color: var(--warn); }
-.sec-f { color: var(--ink3); transition: transform .2s; font-size: 12px; }
+.sec-f { color: var(--ink3); font-size: 12px; }
 .sec--abierta .sec-f { transform: rotate(180deg); }
 .sec-cuerpo { display: none; padding: 4px 14px 14px; border-top: 1px solid var(--line2); }
 .sec--abierta .sec-cuerpo { display: block; padding-top: 14px; }
@@ -222,7 +222,7 @@ textarea { resize: vertical; min-height: 84px; font-family: inherit; }
 .foto-fila { display: flex; gap: 14px; align-items: flex-start; }
 .foto-prev { width: 69px; height: 81px; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); flex: none; background: var(--surface2); }
 .foto-prev img { width: 100%; height: 100%; object-fit: cover; display: block; }
-#btn-comp { gap: 9px; } .prog { display: inline-block; width: 46px; height: 6px; border-radius: 99px; background: rgba(255, 255, 255, .25); overflow: hidden; } .prog i { display: block; height: 100%; background: #4FD1CB; border-radius: 99px; transition: width .3s; }
+#btn-comp { gap: 9px; } .prog { display: inline-block; width: 46px; height: 6px; border-radius: 99px; background: rgba(255, 255, 255, .25); overflow: hidden; } .prog i { display: block; height: 100%; background: #4FD1CB; border-radius: 99px; }
 .vista { position: relative; min-width: 0; min-height: 0; background: var(--lienzo); display: flex; flex-direction: column; }
 /* El CV se escala en .vista-caja; debajo queda una franja para el aviso de ajuste y, en «Ver CV», los botones flotantes, que así no tapan el pie del CV. */
 .vista-caja { flex: 1; min-height: 0; overflow: hidden; margin-bottom: 44px; }
@@ -811,9 +811,24 @@ html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
         botones: [{ texto: 'Cancelar', clase: 'btn--ghost' }, { texto: textoOk || 'Aceptar', clase: peligro ? 'btn--peligro' : 'btn--prim', cb() { hecho = true; res(true); } }] });
     });
   }
+  /* Tema día/noche de la interfaz (no del lienzo del CV). Sin preferencia guardada sigue al sistema (prefers-color-scheme),
+     también si cambia con la herramienta abierta; al pulsar el botón se guarda en localStorage y ya manda esa elección. */
   const tema = {
-    init() { let t = 'dia'; try { t = localStorage.getItem('kpmg-cv-tema') || 'dia'; } catch (e) { } D.documentElement.setAttribute('data-tema', t); },
-    alternar() { const t = D.documentElement.getAttribute('data-tema') === 'noche' ? 'dia' : 'noche'; D.documentElement.setAttribute('data-tema', t); try { localStorage.setItem('kpmg-cv-tema', t); } catch (e) { } return t; }
+    _cb: null,
+    guardado() { try { const t = localStorage.getItem('kpmg-cv-tema'); return t === 'dia' || t === 'noche' ? t : null; } catch (e) { return null; } },
+    sistema() { return g.matchMedia && g.matchMedia('(prefers-color-scheme: dark)').matches ? 'noche' : 'dia'; },
+    actual() { return D.documentElement.getAttribute('data-tema') === 'noche' ? 'noche' : 'dia'; },
+    poner(t) { D.documentElement.setAttribute('data-tema', t); if (this._cb) this._cb(t); },
+    init(cb) {
+      this._cb = cb || null;
+      this.poner(this.guardado() || this.sistema());
+      if (g.matchMedia) {
+        const mq = g.matchMedia('(prefers-color-scheme: dark)');
+        const alCambiar = () => { if (!this.guardado()) this.poner(this.sistema()); };
+        if (mq.addEventListener) mq.addEventListener('change', alCambiar); else if (mq.addListener) mq.addListener(alCambiar);
+      }
+    },
+    alternar() { const t = this.actual() === 'noche' ? 'dia' : 'noche'; try { localStorage.setItem('kpmg-cv-tema', t); } catch (e) { } this.poner(t); return t; }
   };
   const debounce = (f, ms) => { let t; return function () { clearTimeout(t); const a = arguments; t = setTimeout(() => f.apply(null, a), ms); }; };
 
@@ -852,7 +867,6 @@ html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
     return null;
   }
   function arrancar() {
-    K.tema.init();
     const d = leerDatosIncrustados();
     if (d) { S.data = d; S.modo = K.vacioTotal(d) ? 'editar' : 'ver'; }
     montar();
@@ -880,12 +894,13 @@ html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
       '<button role="menuitem" data-acc="traducir-copilot">Traducir al inglés con Copilot<small>Genera la versión EN a partir del español</small></button></div></div>' +
       '<button class="btn" data-acc="abrir">Abrir CV</button>' +
       '<button class="btn btn--prim" data-acc="guardar" title="Ctrl+S">Guardar</button>' +
+      '<button class="btn btn--icono" id="btn-tema" data-acc="tema"></button>' +
       '<div class="menu"><button class="btn btn--icono" id="btn-mas" aria-label="Más opciones" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-mas">⋯</button><div class="menu-lista" id="menu-mas" role="menu" aria-label="Más opciones" hidden>' +
       '<button role="menuitem" data-acc="guardar-como">Guardar como…<small>Elegir otra carpeta o nombre</small></button>' +
       '<button role="menuitem" data-acc="descargar">Descargar una copia</button>' +
       '<button role="menuitem" data-acc="imprimir">Imprimir / guardar en PDF</button>' +
       '<button role="menuitem" data-acc="json">Exportar datos (JSON)<small>Mismo formato que el catálogo de HTML Maker</small></button><hr role="separator">' +
-      '<button role="menuitem" data-acc="tema">Cambiar modo día / noche</button><button role="menuitem" data-acc="nuevo">Nuevo CV en blanco</button></div></div>' +
+      '<button role="menuitem" data-acc="nuevo">Nuevo CV en blanco</button></div></div>' +
       '</header>' +
       '<div class="cuerpo"><aside class="panel" id="panel" aria-label="Formulario del CV"></aside>' +
       '<main class="vista" id="vista"><div class="vista-caja" id="cvbox"></div>' +
@@ -898,6 +913,7 @@ html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
     $('#panel').addEventListener('focusin', e => { const c = e.target.closest('[data-campo]'); S.ctl.foco(c ? c.dataset.campo : null); });
     $('#panel').addEventListener('focusout', () => S.ctl.foco(null));
     D_cierraMenus();
+    K.tema.init(pintarBotonTema);
     aplicarModo(); pintarPanel(); pintarEstado(); pintarBienvenida();
   }
   /* Menús desplegables (Copilot y ⋯): aria-expanded en el botón, flechas para moverse, Escape cierra y devuelve el foco. */
@@ -911,6 +927,14 @@ html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
       else if (e.key === 'Home' || e.key === 'End') { e.preventDefault(); items[e.key === 'Home' ? 0 : items.length - 1].focus(); }
       else if (e.key === 'Tab') cerrarMenus();
     });
+  }
+  /* Botón ☀/☾ de la barra: muestra el tema al que se pasa al pulsarlo. */
+  function pintarBotonTema(t) {
+    const b = $('#btn-tema'); if (!b) return;
+    const noche = t === 'noche';
+    b.textContent = noche ? '☀' : '☾';
+    b.setAttribute('aria-label', noche ? 'Cambiar a modo día' : 'Cambiar a modo noche');
+    b.title = b.getAttribute('aria-label');
   }
   function cerrarMenus(devolverFoco) {
     $$('.menu-lista').forEach(m => {

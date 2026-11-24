@@ -22,7 +22,6 @@
     return null;
   }
   function arrancar() {
-    K.tema.init();
     const d = leerDatosIncrustados();
     if (d) { S.data = d; S.modo = K.vacioTotal(d) ? 'editar' : 'ver'; }
     montar();
@@ -50,12 +49,13 @@
       '<button role="menuitem" data-acc="traducir-copilot">Traducir al inglés con Copilot<small>Genera la versión EN a partir del español</small></button></div></div>' +
       '<button class="btn" data-acc="abrir">Abrir CV</button>' +
       '<button class="btn btn--prim" data-acc="guardar" title="Ctrl+S">Guardar</button>' +
+      '<button class="btn btn--icono" id="btn-tema" data-acc="tema"></button>' +
       '<div class="menu"><button class="btn btn--icono" id="btn-mas" aria-label="Más opciones" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-mas">⋯</button><div class="menu-lista" id="menu-mas" role="menu" aria-label="Más opciones" hidden>' +
       '<button role="menuitem" data-acc="guardar-como">Guardar como…<small>Elegir otra carpeta o nombre</small></button>' +
       '<button role="menuitem" data-acc="descargar">Descargar una copia</button>' +
       '<button role="menuitem" data-acc="imprimir">Imprimir / guardar en PDF</button>' +
       '<button role="menuitem" data-acc="json">Exportar datos (JSON)<small>Mismo formato que el catálogo de HTML Maker</small></button><hr role="separator">' +
-      '<button role="menuitem" data-acc="tema">Cambiar modo día / noche</button><button role="menuitem" data-acc="nuevo">Nuevo CV en blanco</button></div></div>' +
+      '<button role="menuitem" data-acc="nuevo">Nuevo CV en blanco</button></div></div>' +
       '</header>' +
       '<div class="cuerpo"><aside class="panel" id="panel" aria-label="Formulario del CV"></aside>' +
       '<main class="vista" id="vista"><div class="vista-caja" id="cvbox"></div>' +
@@ -68,6 +68,7 @@
     $('#panel').addEventListener('focusin', e => { const c = e.target.closest('[data-campo]'); S.ctl.foco(c ? c.dataset.campo : null); });
     $('#panel').addEventListener('focusout', () => S.ctl.foco(null));
     D_cierraMenus();
+    K.tema.init(pintarBotonTema);
     aplicarModo(); pintarPanel(); pintarEstado(); pintarBienvenida();
   }
   /* Menús desplegables (Copilot y ⋯): aria-expanded en el botón, flechas para moverse, Escape cierra y devuelve el foco. */
@@ -81,6 +82,14 @@
       else if (e.key === 'Home' || e.key === 'End') { e.preventDefault(); items[e.key === 'Home' ? 0 : items.length - 1].focus(); }
       else if (e.key === 'Tab') cerrarMenus();
     });
+  }
+  /* Botón ☀/☾ de la barra: muestra el tema al que se pasa al pulsarlo. */
+  function pintarBotonTema(t) {
+    const b = $('#btn-tema'); if (!b) return;
+    const noche = t === 'noche';
+    b.textContent = noche ? '☀' : '☾';
+    b.setAttribute('aria-label', noche ? 'Cambiar a modo día' : 'Cambiar a modo noche');
+    b.title = b.getAttribute('aria-label');
   }
   function cerrarMenus(devolverFoco) {
     $$('.menu-lista').forEach(m => {
