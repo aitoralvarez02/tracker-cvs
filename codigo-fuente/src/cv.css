@@ -1,0 +1,65 @@
+/* ===== CV completo — réplica de «Ver CV completo» de HTML Maker (modo slides, lienzo 1600×900) ===== */
+.cv-escala { position: relative; margin: 0 auto; flex: none; }
+.cv-lienzo {
+  position: absolute; top: 0; left: 0; display: flex; width: 1600px; height: 900px; background: #fff;
+  border-radius: 14px; overflow: hidden; box-shadow: 0 16px 56px rgba(0, 31, 91, .3);
+  font-family: 'Open Sans', 'Segoe UI', system-ui, sans-serif; color: #2D2D2D; text-align: left;
+  transform-origin: top left; --vin-c: #00338D;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.cv-lienzo *, .cv-lienzo *::before, .cv-lienzo *::after { box-sizing: border-box; }
+.cv-side { position: relative; width: 340px; flex: none; overflow: hidden; background: linear-gradient(175deg, #00338D 0%, #1E49E2 100%); }
+.cv-persona { position: absolute; top: 56px; left: 32px; right: 32px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.cv-foto { width: 92px; height: 108px; object-fit: cover; object-position: center top; display: block; margin-bottom: 20px; }
+.cv-nombre { font-size: 24px; font-weight: 700; color: #fff; line-height: 1.2; margin: 0 0 8px; overflow-wrap: anywhere; }
+.cv-cargo { font-size: 15px; font-weight: 600; font-style: italic; color: rgba(255, 255, 255, .85); line-height: 1.4; margin: 0 0 6px; }
+.cv-empresa { font-size: 12.5px; font-weight: 600; color: rgba(255, 255, 255, .55); margin: 0 0 16px; text-transform: uppercase; letter-spacing: .5px; }
+.cv-links { display: flex; gap: 14px; min-height: 0; }
+.cv-link { width: 38px; height: 38px; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, .4); color: rgba(255, 255, 255, .85); display: flex; align-items: center; justify-content: center; }
+.cv-formacion { position: absolute; top: 388px; left: 32px; right: 32px; border-top: 1px solid rgba(255, 255, 255, .25); padding-top: 24px; text-align: left; }
+.cv-formacion-t { font-size: 14px; font-weight: 700; color: #7FC8F8; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 14px; }
+.cv-formacion-l { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 16px; }
+.cv-formacion-l li { font-size: inherit; color: #fff; line-height: 1.45; padding-left: 16px; position: relative; }
+.cv-formacion-l li::before { content: '\203A'; position: absolute; left: 0; color: #009FDA; font-weight: 700; font-size: 16px; line-height: 1.35; }
+
+.cv-main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: #fff; }
+.cv-fijo { flex: none; padding: 44px 56px 0 60px; }
+.cv-fijo h2 { font-size: 44px; font-weight: 700; color: #00338D; margin: 0; padding-bottom: 10px; border-bottom: 3px solid #4A8FDB; text-align: justify; line-height: 1.2; }
+.cv-fijo h3 { font-size: 26px; font-weight: 700; color: #00205B; margin: 24px 0 14px; line-height: 1.2; }
+.cv-zona { flex: 1; min-height: 0; position: relative; margin: 6px 56px 16px 60px; }
+.cv-texto { position: absolute; inset: 0; font-size: 16px; line-height: 1.6; text-align: justify; color: #2D2D2D; column-count: var(--cols, 1); column-gap: 64px; column-rule: 2px solid #B7CBEA; }
+.cv-texto strong { color: #141A59; font-weight: 700; }
+.cv-p { margin: 0 0 16px; break-inside: avoid; }
+.cv-p:last-child { margin-bottom: 0; }
+.cv-p--azul, .cv-p--azul strong { color: #00338D; }
+.cv-p--azul:has(+ .cv-p:not(.cv-p--azul)) { margin-bottom: 26px; }
+.cv-p--intro { break-after: avoid; }
+/* viñeta «flecha» de HTML Maker (txt-vin) */
+.cv-p--punto { position: relative; margin: 4px 0 0; padding-left: calc(12px + 1.25em); line-height: 1.45; }
+.cv-p--punto:not(.cv-p--punto + .cv-p--punto) { margin-top: 24px; }
+.cv-p--punto:not(:has(+ .cv-p--punto)) { margin-bottom: 20px; }
+.cv-p:not(.cv-p--punto):has(+ .cv-p--punto) { margin-bottom: 0; }
+.cv-p--punto:not(:has(+ .cv-p--punto)) + .cv-p:not(.cv-p--punto) { margin-top: 0; }
+.cv-p--punto:last-child { margin-bottom: 0; }
+.cv-p--punto::before { content: ""; position: absolute; left: 12px; top: calc(.5lh - 3.5px); width: 7px; height: 7px; border-top: 2px solid var(--vin-c); border-right: 2px solid var(--vin-c); border-radius: 0 1px 0 0; transform: rotate(45deg); }
+.cv-pie { flex: none; margin: 0 56px 0 60px; border-top: 1px solid #E3EAF6; height: 57px; display: flex; align-items: center; gap: 36px; }
+.cv-pie img { width: 66px; height: auto; flex: none; display: block; }
+.cv-pie span { font-size: 10px; line-height: 1.3; max-width: 780px; opacity: .6; color: #4A5568; font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cv-lienzo[data-ajuste="no"] .cv-zona { outline: 3px dashed #E0313F; outline-offset: 2px; }
+
+/* resaltado del campo que se está editando */
+.cv-lienzo [data-campo] { transition: outline-color .15s; outline: 3px solid transparent; outline-offset: 6px; border-radius: 4px; }
+.cv-lienzo[data-foco="nombre"] [data-campo="nombre"], .cv-lienzo[data-foco="cargo"] [data-campo="cargo"], .cv-lienzo[data-foco="empresa"] [data-campo="empresa"],
+.cv-lienzo[data-foco="foto"] [data-campo="foto"], .cv-lienzo[data-foco="links"] [data-campo="links"], .cv-lienzo[data-foco="formacion"] [data-campo="formacion"],
+.cv-lienzo[data-foco="exp"] [data-campo="exp"] { outline-color: #00B8F5; }
+.cv-lienzo[data-foco="exp"] [data-campo="exp"] { outline-offset: 10px; }
+.cv-lienzo.cv-editable [data-campo] { cursor: pointer; }
+
+@media print {
+  @page { size: 1600px 900px; margin: 0; }
+  html, body { margin: 0 !important; background: #fff !important; }
+  body.imprimiendo > *:not(#cv-impresion) { display: none !important; }
+  #cv-impresion { display: block !important; }
+  #cv-impresion .cv-lienzo { position: static; border-radius: 0; box-shadow: none; transform: none !important; }
+}
+#cv-impresion { display: none; }
