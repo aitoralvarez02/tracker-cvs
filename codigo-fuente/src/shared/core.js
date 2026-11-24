@@ -433,21 +433,31 @@
     setTimeout(() => URL.revokeObjectURL(url), 1500);
   }
   const TIPOS = { html: ['Página HTML', 'text/html', '.html'], json: ['JSON', 'application/json', '.json'], csv: ['CSV', 'text/csv', '.csv'] };
-  /* opt: {id (recuerda carpeta), key (recuerda archivo), asa (asa ya abierta)} */
+  /* Guarda con File System Access (Edge/Chrome) sobrescribiendo el mismo archivo; si no se puede, lo descarga.
+     opt: {id (recuerda carpeta), key (recuerda archivo), asa (asa ya abierta), mod (lastModified de cuando se abrió
+     o guardó esa asa), antesDeSobrescribir(file) → true (sobrescribir) | false (cancelar) | 'como' (elegir otro)}.
+     Antes de sobrescribir compara lastModified: si el archivo cambió en disco desde entonces, pregunta. */
   async function guardar(nombre, texto, opt) {
     opt = opt || {};
     const ext = (nombre.split('.').pop() || 'html').toLowerCase(), T = TIPOS[ext] || TIPOS.html;
     if (g.showSaveFilePicker) {
       try {
-        let h = opt.asa || null;
-        if (!h && opt.key) { h = await IDB.get('asa:' + opt.key); if (h && h.name !== nombre) h = null; }
+        let h = opt.asa || null, mod = opt.asa ? (opt.mod || null) : null, recordada = false;
+        if (!h && opt.key) { h = await IDB.get('asa:' + opt.key); if (h && h.name !== nombre) h = null; if (h) { recordada = true; mod = await IDB.get('mod:' + opt.key); } }
         if (h) { try { const p = (await h.queryPermission({ mode: 'readwrite' })) === 'granted' || (await h.requestPermission({ mode: 'readwrite' })) === 'granted'; if (!p) h = null; } catch (e) { h = null; } }
-        if (!h) {
-          h = await g.showSaveFilePicker({ id: opt.id || 'kpmg-cv', suggestedName: nombre, types: [{ description: T[0], accept: { [T[1]]: [T[2]] } }] });
-          if (opt.key) await IDB.set('asa:' + opt.key, h);
+        if (h && opt.antesDeSobrescribir) {
+          let f = null; try { f = await h.getFile(); } catch (e) { f = null; /* borrado o movido: se elige de nuevo */ }
+          if (!f) h = null;
+          else if (mod ? f.lastModified !== mod : recordada) {
+            const r = await opt.antesDeSobrescribir(f);
+            if (r === 'como') h = null; else if (!r) return { ok: false, cancelado: true };
+          }
         }
+        if (!h) h = await g.showSaveFilePicker({ id: opt.id || 'kpmg-cv', suggestedName: nombre, types: [{ description: T[0], accept: { [T[1]]: [T[2]] } }] });
         const w = await h.createWritable(); await w.write(new Blob([texto], { type: T[1] })); await w.close();
-        return { ok: true, nombre: h.name, via: 'archivo', asa: h };
+        let nuevo = null; try { nuevo = (await h.getFile()).lastModified; } catch (e) { }
+        if (opt.key) { await IDB.set('asa:' + opt.key, h); await IDB.set('mod:' + opt.key, nuevo); }
+        return { ok: true, nombre: h.name, via: 'archivo', asa: h, mod: nuevo };
       } catch (e) {
         if (e && e.name === 'AbortError') return { ok: false, cancelado: true };
         /* sin permisos o contexto no válido: se descarga */
@@ -480,7 +490,7 @@
     const t = D.createElement('div'); t.className = 'toast' + (tipo ? ' toast--' + tipo : ''); t.setAttribute('role', 'status'); t.textContent = msg;
     c.appendChild(t); while (c.children.length > 3) c.firstChild.remove();
     requestAnimationFrame(() => t.classList.add('on'));
-    setTimeout(() => { t.classList.remove('on'); setTimeout(() => t.remove(), 300); }, tipo === 'error' ? 6000 : 3200);
+    setTimeout(() => { t.classList.remove('on'); setTimeout(() => t.remove(), 300); }, tipo === 'aviso' ? 10000 : tipo === 'error' ? 6000 : 3200);
   }
   /* dialogo({titulo, cuerpo: Node|string(html), botones:[{texto, clase, cb → false para no cerrar}], ancho, cerrar}) */
   function dialogo(o) {

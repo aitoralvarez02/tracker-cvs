@@ -336,3 +336,71 @@ test('foto con ruta de HTML Maker: avisa de que hay que subirla y conserva la ru
   await expect(p2.locator('#panel .aviso-foto')).toHaveCount(0);
   await expect(p2.locator('#cvbox .cv-foto')).toHaveAttribute('src', /^data:image\/jpeg;base64,/);
 });
+
+/* ---------- Guardado con File System Access (simulado: un archivo en memoria con lastModified) ---------- */
+async function editorConArchivo(page, html) {
+  await page.addInitScript(texto => {
+    const fsx = window.__fs = { name: 'CV_Ana_Prueba_Nunez.html', text: texto, mod: 1700000000000, escrituras: 0, picker: 0 };
+    const asa = {
+      kind: 'file', get name() { return fsx.name; },
+      async getFile() { return new File([fsx.text], fsx.name, { type: 'text/html', lastModified: fsx.mod }); },
+      async createWritable() { let buf = ''; return { async write(b) { buf = typeof b === 'string' ? b : await b.text(); }, async close() { fsx.text = buf; fsx.mod += 1000; fsx.escrituras++; } }; },
+      async queryPermission() { return 'granted'; }, async requestPermission() { return 'granted'; }
+    };
+    window.showOpenFilePicker = async () => [asa];
+    window.showSaveFilePicker = async () => { fsx.picker++; return asa; };
+  }, html);
+  await page.goto(URL_HTML);
+  await page.locator('header [data-acc="abrir"]').click();
+  await expect(page.locator('#app')).toHaveAttribute('data-modo', 'ver');
+}
+const fsx = page => page.evaluate(() => ({ escrituras: __fs.escrituras, picker: __fs.picker, text: __fs.text }));
+async function cambiarCargo(page, v) {
+  await page.locator('header [data-modo="editar"]').click();
+  await page.locator('#panel [data-k="cargo"]').fill(v);
+}
+
+test('guardado: sobrescribe el mismo archivo y, si cambió en disco, pide confirmación', async ({ page }) => {
+  await abrirEditor(page);
+  await abrirCV(page, FIX('cv-completo.json'));
+  const html = (await guardar(page)).texto;
+  const p = await page.context().newPage();
+  await editorConArchivo(p, html);
+  await cambiarCargo(p, 'Cargo uno');
+  await p.locator('header [data-acc="guardar"]').click();
+  await expect(p.locator('.toast--ok', { hasText: 'Guardado en' })).toContainText('«CV_Ana_Prueba_Nunez.html»');
+  expect(await fsx(p)).toMatchObject({ escrituras: 1, picker: 0 });
+  // otra persona lo cambia en disco
+  await p.evaluate(() => { __fs.mod += 60000; __fs.text = 'CAMBIO AJENO'; });
+  await cambiarCargo(p, 'Cargo dos');
+  await p.locator('header [data-acc="guardar"]').click();
+  await expect(p.locator('.dlg h2')).toHaveText('El archivo ha cambiado en disco');
+  await p.locator('.dlg button', { hasText: 'Cancelar' }).click();
+  expect(await fsx(p)).toMatchObject({ escrituras: 1, text: 'CAMBIO AJENO' });
+  await expect(p.locator('#estado span')).toHaveText('Sin guardar');
+  // ahora sí
+  await p.locator('header [data-acc="guardar"]').click();
+  await p.locator('.dlg button', { hasText: 'Sobrescribir' }).click();
+  await expect.poll(async () => (await fsx(p)).escrituras).toBe(2);
+  expect(datosDe((await fsx(p)).text).cargo).toBe('Cargo dos');
+  // y sin cambios ajenos, no vuelve a preguntar
+  await cambiarCargo(p, 'Cargo tres');
+  await p.locator('header [data-acc="guardar"]').click();
+  await expect.poll(async () => (await fsx(p)).escrituras).toBe(3);
+  await expect(p.locator('.dlg')).toHaveCount(0);
+  // «Guardar como…» desde el aviso abre el selector de archivo
+  await p.evaluate(() => { __fs.mod += 60000; });
+  await cambiarCargo(p, 'Cargo cuatro');
+  await p.locator('header [data-acc="guardar"]').click();
+  await p.locator('.dlg button', { hasText: 'Guardar como…' }).click();
+  await expect.poll(async () => (await fsx(p)).escrituras).toBe(4);
+  expect((await fsx(p)).picker).toBe(1);
+});
+
+test('descarga: avisa de que el navegador puede añadir « (1)» y hay que sustituir el anterior', async ({ page }) => {
+  await abrirEditor(page);
+  await abrirCV(page, FIX('cv-completo.json'));
+  await guardar(page);
+  await expect(page.locator('.toast--aviso')).toContainText('CV_Ana_Prueba_Nunez (1).html');
+  await expect(page.locator('.toast--aviso')).toContainText('sustituye el anterior');
+});

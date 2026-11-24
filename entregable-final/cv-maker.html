@@ -105,7 +105,7 @@ textarea { resize: vertical; min-height: 84px; font-family: inherit; }
 #toasts { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 400; pointer-events: none; }
 .toast { opacity: 0; transform: translateY(14px); background: #0B1F3F; color: #fff; padding: 10px 18px; border-radius: 10px; font-size: 13.5px; transition: all .25s; box-shadow: 0 12px 30px rgba(0, 0, 0, .35); max-width: 80vw; }
 .toast.on { opacity: 1; transform: none; }
-.toast--error { background: var(--bad); } .toast--ok { background: #00756F; }
+.toast--error { background: var(--bad); } .toast--ok { background: #00756F; } .toast--aviso { background: #8F5600; }
 @keyframes fundir { from { opacity: 0; } } @keyframes subir { from { transform: translateY(10px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 .vacio-estado { text-align: center; color: var(--ink3); padding: 40px 20px; }
@@ -681,21 +681,31 @@ html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
     setTimeout(() => URL.revokeObjectURL(url), 1500);
   }
   const TIPOS = { html: ['Página HTML', 'text/html', '.html'], json: ['JSON', 'application/json', '.json'], csv: ['CSV', 'text/csv', '.csv'] };
-  /* opt: {id (recuerda carpeta), key (recuerda archivo), asa (asa ya abierta)} */
+  /* Guarda con File System Access (Edge/Chrome) sobrescribiendo el mismo archivo; si no se puede, lo descarga.
+     opt: {id (recuerda carpeta), key (recuerda archivo), asa (asa ya abierta), mod (lastModified de cuando se abrió
+     o guardó esa asa), antesDeSobrescribir(file) → true (sobrescribir) | false (cancelar) | 'como' (elegir otro)}.
+     Antes de sobrescribir compara lastModified: si el archivo cambió en disco desde entonces, pregunta. */
   async function guardar(nombre, texto, opt) {
     opt = opt || {};
     const ext = (nombre.split('.').pop() || 'html').toLowerCase(), T = TIPOS[ext] || TIPOS.html;
     if (g.showSaveFilePicker) {
       try {
-        let h = opt.asa || null;
-        if (!h && opt.key) { h = await IDB.get('asa:' + opt.key); if (h && h.name !== nombre) h = null; }
+        let h = opt.asa || null, mod = opt.asa ? (opt.mod || null) : null, recordada = false;
+        if (!h && opt.key) { h = await IDB.get('asa:' + opt.key); if (h && h.name !== nombre) h = null; if (h) { recordada = true; mod = await IDB.get('mod:' + opt.key); } }
         if (h) { try { const p = (await h.queryPermission({ mode: 'readwrite' })) === 'granted' || (await h.requestPermission({ mode: 'readwrite' })) === 'granted'; if (!p) h = null; } catch (e) { h = null; } }
-        if (!h) {
-          h = await g.showSaveFilePicker({ id: opt.id || 'kpmg-cv', suggestedName: nombre, types: [{ description: T[0], accept: { [T[1]]: [T[2]] } }] });
-          if (opt.key) await IDB.set('asa:' + opt.key, h);
+        if (h && opt.antesDeSobrescribir) {
+          let f = null; try { f = await h.getFile(); } catch (e) { f = null; /* borrado o movido: se elige de nuevo */ }
+          if (!f) h = null;
+          else if (mod ? f.lastModified !== mod : recordada) {
+            const r = await opt.antesDeSobrescribir(f);
+            if (r === 'como') h = null; else if (!r) return { ok: false, cancelado: true };
+          }
         }
+        if (!h) h = await g.showSaveFilePicker({ id: opt.id || 'kpmg-cv', suggestedName: nombre, types: [{ description: T[0], accept: { [T[1]]: [T[2]] } }] });
         const w = await h.createWritable(); await w.write(new Blob([texto], { type: T[1] })); await w.close();
-        return { ok: true, nombre: h.name, via: 'archivo', asa: h };
+        let nuevo = null; try { nuevo = (await h.getFile()).lastModified; } catch (e) { }
+        if (opt.key) { await IDB.set('asa:' + opt.key, h); await IDB.set('mod:' + opt.key, nuevo); }
+        return { ok: true, nombre: h.name, via: 'archivo', asa: h, mod: nuevo };
       } catch (e) {
         if (e && e.name === 'AbortError') return { ok: false, cancelado: true };
         /* sin permisos o contexto no válido: se descarga */
@@ -728,7 +738,7 @@ html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
     const t = D.createElement('div'); t.className = 'toast' + (tipo ? ' toast--' + tipo : ''); t.setAttribute('role', 'status'); t.textContent = msg;
     c.appendChild(t); while (c.children.length > 3) c.firstChild.remove();
     requestAnimationFrame(() => t.classList.add('on'));
-    setTimeout(() => { t.classList.remove('on'); setTimeout(() => t.remove(), 300); }, tipo === 'error' ? 6000 : 3200);
+    setTimeout(() => { t.classList.remove('on'); setTimeout(() => t.remove(), 300); }, tipo === 'aviso' ? 10000 : tipo === 'error' ? 6000 : 3200);
   }
   /* dialogo({titulo, cuerpo: Node|string(html), botones:[{texto, clase, cb → false para no cerrar}], ancho, cerrar}) */
   function dialogo(o) {
@@ -783,7 +793,7 @@ html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
   'use strict';
   const K = CVK, $ = K.$, $$ = K.$$, esc = K.esc;
   const S = {
-    data: K.emptyCV(), lang: 'es', modo: 'editar', sucio: false, guardadoEn: null, nombreArchivo: '', asa: null,
+    data: K.emptyCV(), lang: 'es', modo: 'editar', sucio: false, guardadoEn: null, nombreArchivo: '', asa: null, mod: null,
     abierto: { persona: true, visor: false, resumen: false, formacion: false, exp: false }, ctl: null
   };
   const LANGUAGED = ['cargo', 'empresa', 'insights', 'formacion', 'parrafo_azul', 'cuerpo'];
@@ -1001,7 +1011,7 @@ html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
       case 'foto-quita': S.data.foto = ''; pintarPanel(); cambio(); break;
       case 'guardar': guardar(); break;
       case 'guardar-como': guardar(true); break;
-      case 'descargar': datosGuardar().then(o => { K.descargar(buildHtml(o), nombreSugerido()); toast('Copia descargada.'); }); break;
+      case 'descargar': datosGuardar().then(o => { K.descargar(buildHtml(o), nombreSugerido()); avisoDescarga(nombreSugerido()); }); break;
       case 'imprimir': K.imprimirCV(S.data, S.lang); break;
       case 'json': datosGuardar().then(o => K.descargar(JSON.stringify(o, null, 1), nombreSugerido().replace(/\.html$/, '.json'), 'application/json;charset=utf-8')); break;
       case 'abrir': abrirArchivo(); break;
@@ -1129,12 +1139,27 @@ html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
     const malos = [['linkedin', 'LinkedIn'], ['tendencias', 'KPMG Tendencias']].filter(([k]) => S.data[k].trim() && !K.urlOk(S.data[k].trim()));
     if (malos.length) { malos.forEach(([k]) => { S.data[k] = ''; }); pintarPanel(); S.ctl.pintar(S.data, S.lang); toast('El enlace de ' + malos.map(m => m[1]).join(' y ') + ' no es válido (debe empezar por https:// y no llevar espacios ni comillas): se ha quitado.', 'error'); }
     const nombre = nombreSugerido();
-    const r = await K.guardar(nombre, buildHtml(await datosGuardar()), { key: 'cv-maker', id: 'cv-maker', asa: como ? null : S.asa });
+    const r = await K.guardar(nombre, buildHtml(await datosGuardar()), { key: 'cv-maker', id: 'cv-maker', asa: como ? null : S.asa, mod: S.mod, antesDeSobrescribir: confirmarSobrescribir });
     if (!r.ok) return;
-    S.sucio = false; S.guardadoEn = new Date(); S.asa = r.asa || null; S.nombreArchivo = r.nombre; try { localStorage.removeItem('cvmaker-borrador'); } catch (e) { }
+    S.sucio = false; S.guardadoEn = new Date(); S.asa = r.asa || null; S.mod = r.mod || null; S.nombreArchivo = r.nombre; try { localStorage.removeItem('cvmaker-borrador'); } catch (e) { }
     const pend = K.completitud(S.data); pintarEstado();
     if (r.via === 'archivo') toast('Guardado en «' + r.nombre + '»' + (pend.hechos < pend.total ? ' · faltan ' + (pend.total - pend.hechos) + ' campos' : ''), 'ok');
-    else toast('Descargado «' + r.nombre + '». Guárdalo en la carpeta compartida del equipo.', 'ok');
+    else avisoDescarga(r.nombre);
+  }
+  /* El archivo cambió en disco desde que se abrió o guardó (otra persona, otra pestaña o la sincronización de OneDrive). */
+  function confirmarSobrescribir(f) {
+    return new Promise(res => {
+      let r = false;
+      K.dialogo({ titulo: 'El archivo ha cambiado en disco', ancho: 520, alCerrar() { res(r); },
+        cuerpo: '<p class="dlg-p"><b>' + esc(f.name) + '</b> se ha modificado (' + esc(new Date(f.lastModified).toLocaleString('es-ES')) + ') después de que lo abrieras o guardaras aquí. Puede haberlo cambiado otra persona, otra pestaña o la sincronización de OneDrive.</p>' +
+          '<p class="dlg-p">Si lo sobrescribes, esos cambios se pierden.</p>',
+        botones: [{ texto: 'Cancelar', clase: 'btn--ghost' }, { texto: 'Guardar como…', cb() { r = 'como'; } }, { texto: 'Sobrescribir', clase: 'btn--peligro', cb() { r = true; } }] });
+    });
+  }
+  /* Sin File System Access (o con una política que lo bloquea) el CV se descarga y el navegador puede renombrarlo. */
+  function avisoDescarga(nombre) {
+    const base = nombre.replace(/\.html$/i, '');
+    toast('Descargado «' + nombre + '». Muévelo a la carpeta compartida y sustituye el anterior. Si el navegador lo ha llamado «' + base + ' (1).html», quítale el « (1)» al sustituirlo.', 'aviso');
   }
   function guardarBorrador() { try { if (S.sucio && !K.vacioTotal(S.data)) localStorage.setItem('cvmaker-borrador', JSON.stringify({ t: Date.now(), data: S.data })); } catch (e) { } }
   function recuperarBorrador() {
@@ -1151,13 +1176,13 @@ html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
   /* ---------- Abrir / nuevo / cargar ---------- */
   async function abrirArchivo() {
     const r = await K.abrir({ id: 'cv-maker-abrir' }); if (!r) return;
-    cargarArchivo(r.name, r.text, r.asa);
+    cargarArchivo(r.name, r.text, r.asa, r.lastModified);
   }
-  async function cargarArchivo(nombre, texto, asa) {
+  async function cargarArchivo(nombre, texto, asa, mod) {
     if (S.sucio && !(await K.confirmar('Cambios sin guardar', 'Si abres otro CV se perderán los cambios actuales. ¿Continuar?', 'Abrir', true))) return;
     try {
       const l = K.leerCVs(nombre, texto);
-      S.data = l[0]; S.asa = (asa && /\.html?$/i.test(nombre)) ? asa : null; S.nombreArchivo = nombre; S.sucio = false; S.guardadoEn = null;
+      S.data = l[0]; S.asa = (asa && /\.html?$/i.test(nombre)) ? asa : null; S.mod = S.asa ? (mod || null) : null; S.nombreArchivo = nombre; S.sucio = false; S.guardadoEn = null;
       S.modo = 'ver'; aplicarModo(); refrescarTodo();
       avisoFotoRuta();
       toast(l.length > 1 ? 'El archivo tenía ' + l.length + ' CVs; se ha abierto el primero.' : 'CV abierto: ' + (S.data.nombre || nombre), 'ok');
@@ -1165,7 +1190,7 @@ html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
   }
   async function nuevoCV() {
     if (S.sucio && !(await K.confirmar('Cambios sin guardar', 'Se perderán los cambios actuales. ¿Crear un CV en blanco?', 'Crear en blanco', true))) return;
-    S.data = K.emptyCV(); S.asa = null; S.sucio = false; S.guardadoEn = null; S.nombreArchivo = ''; S.modo = 'editar'; aplicarModo(); refrescarTodo();
+    S.data = K.emptyCV(); S.asa = null; S.mod = null; S.sucio = false; S.guardadoEn = null; S.nombreArchivo = ''; S.modo = 'editar'; aplicarModo(); refrescarTodo();
   }
 
   /* ---------- Copilot: importar / traducir ---------- */

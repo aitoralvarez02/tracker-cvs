@@ -10,6 +10,13 @@ Herramientas para los CVs del equipo GRC de KPMG España.
 
 Cada CV es un HTML autocontenido. Lleva el JSON del CV en `<script type="application/json" id="cv-data">`, en el mismo formato que HTML Maker. El contrato está en [contexto/contrato-datos.md](contexto/contrato-datos.md).
 
+## Guardar el CV
+
+- **Edge o Chrome de escritorio.** El CV Maker usa la API File System Access (`showSaveFilePicker`). La primera vez se elige dónde guardar. Después, «Guardar» (o Ctrl+S) sobrescribe ese mismo archivo, aunque se haya abierto con «Abrir CV».
+- **Cambios en disco.** Antes de sobrescribir, el CV Maker comprueba si el archivo ha cambiado desde que se abrió o se guardó (su fecha de modificación). Si ha cambiado, pregunta: Cancelar, Guardar como… o Sobrescribir. Puede haberlo cambiado otra persona, otra pestaña o la sincronización de OneDrive.
+- **SharePoint.** Funciona a través de la carpeta de SharePoint **sincronizada con OneDrive** en el Explorador de archivos (botón «Sincronizar» de la biblioteca). No funciona desde la web de SharePoint: el navegador no puede escribir en una biblioteca abierta en la web, y el CV acabaría en Descargas.
+- **Si el navegador no puede escribir el archivo, el CV se descarga.** Pasa en Firefox, en Safari y cuando una política corporativa de Edge o Chrome bloquea la escritura: `DefaultFileSystemWriteGuardSetting` = 2, o `FileSystemWriteBlockedForUrls`. Con la descarga, el navegador puede llamar al archivo `CV_Nombre_Apellidos (1).html` si ya había otro con ese nombre en Descargas. Hay que moverlo a la carpeta compartida, sustituir el anterior y quitarle el « (1)». El CV Maker lo recuerda en un aviso.
+
 ## Carpetas
 
 - `entregable-final/`: los HTML que se reparten.

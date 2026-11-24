@@ -3,7 +3,7 @@
   'use strict';
   const K = CVK, $ = K.$, $$ = K.$$, esc = K.esc;
   const S = {
-    data: K.emptyCV(), lang: 'es', modo: 'editar', sucio: false, guardadoEn: null, nombreArchivo: '', asa: null,
+    data: K.emptyCV(), lang: 'es', modo: 'editar', sucio: false, guardadoEn: null, nombreArchivo: '', asa: null, mod: null,
     abierto: { persona: true, visor: false, resumen: false, formacion: false, exp: false }, ctl: null
   };
   const LANGUAGED = ['cargo', 'empresa', 'insights', 'formacion', 'parrafo_azul', 'cuerpo'];
@@ -221,7 +221,7 @@
       case 'foto-quita': S.data.foto = ''; pintarPanel(); cambio(); break;
       case 'guardar': guardar(); break;
       case 'guardar-como': guardar(true); break;
-      case 'descargar': datosGuardar().then(o => { K.descargar(buildHtml(o), nombreSugerido()); toast('Copia descargada.'); }); break;
+      case 'descargar': datosGuardar().then(o => { K.descargar(buildHtml(o), nombreSugerido()); avisoDescarga(nombreSugerido()); }); break;
       case 'imprimir': K.imprimirCV(S.data, S.lang); break;
       case 'json': datosGuardar().then(o => K.descargar(JSON.stringify(o, null, 1), nombreSugerido().replace(/\.html$/, '.json'), 'application/json;charset=utf-8')); break;
       case 'abrir': abrirArchivo(); break;
@@ -349,12 +349,27 @@
     const malos = [['linkedin', 'LinkedIn'], ['tendencias', 'KPMG Tendencias']].filter(([k]) => S.data[k].trim() && !K.urlOk(S.data[k].trim()));
     if (malos.length) { malos.forEach(([k]) => { S.data[k] = ''; }); pintarPanel(); S.ctl.pintar(S.data, S.lang); toast('El enlace de ' + malos.map(m => m[1]).join(' y ') + ' no es válido (debe empezar por https:// y no llevar espacios ni comillas): se ha quitado.', 'error'); }
     const nombre = nombreSugerido();
-    const r = await K.guardar(nombre, buildHtml(await datosGuardar()), { key: 'cv-maker', id: 'cv-maker', asa: como ? null : S.asa });
+    const r = await K.guardar(nombre, buildHtml(await datosGuardar()), { key: 'cv-maker', id: 'cv-maker', asa: como ? null : S.asa, mod: S.mod, antesDeSobrescribir: confirmarSobrescribir });
     if (!r.ok) return;
-    S.sucio = false; S.guardadoEn = new Date(); S.asa = r.asa || null; S.nombreArchivo = r.nombre; try { localStorage.removeItem('cvmaker-borrador'); } catch (e) { }
+    S.sucio = false; S.guardadoEn = new Date(); S.asa = r.asa || null; S.mod = r.mod || null; S.nombreArchivo = r.nombre; try { localStorage.removeItem('cvmaker-borrador'); } catch (e) { }
     const pend = K.completitud(S.data); pintarEstado();
     if (r.via === 'archivo') toast('Guardado en «' + r.nombre + '»' + (pend.hechos < pend.total ? ' · faltan ' + (pend.total - pend.hechos) + ' campos' : ''), 'ok');
-    else toast('Descargado «' + r.nombre + '». Guárdalo en la carpeta compartida del equipo.', 'ok');
+    else avisoDescarga(r.nombre);
+  }
+  /* El archivo cambió en disco desde que se abrió o guardó (otra persona, otra pestaña o la sincronización de OneDrive). */
+  function confirmarSobrescribir(f) {
+    return new Promise(res => {
+      let r = false;
+      K.dialogo({ titulo: 'El archivo ha cambiado en disco', ancho: 520, alCerrar() { res(r); },
+        cuerpo: '<p class="dlg-p"><b>' + esc(f.name) + '</b> se ha modificado (' + esc(new Date(f.lastModified).toLocaleString('es-ES')) + ') después de que lo abrieras o guardaras aquí. Puede haberlo cambiado otra persona, otra pestaña o la sincronización de OneDrive.</p>' +
+          '<p class="dlg-p">Si lo sobrescribes, esos cambios se pierden.</p>',
+        botones: [{ texto: 'Cancelar', clase: 'btn--ghost' }, { texto: 'Guardar como…', cb() { r = 'como'; } }, { texto: 'Sobrescribir', clase: 'btn--peligro', cb() { r = true; } }] });
+    });
+  }
+  /* Sin File System Access (o con una política que lo bloquea) el CV se descarga y el navegador puede renombrarlo. */
+  function avisoDescarga(nombre) {
+    const base = nombre.replace(/\.html$/i, '');
+    toast('Descargado «' + nombre + '». Muévelo a la carpeta compartida y sustituye el anterior. Si el navegador lo ha llamado «' + base + ' (1).html», quítale el « (1)» al sustituirlo.', 'aviso');
   }
   function guardarBorrador() { try { if (S.sucio && !K.vacioTotal(S.data)) localStorage.setItem('cvmaker-borrador', JSON.stringify({ t: Date.now(), data: S.data })); } catch (e) { } }
   function recuperarBorrador() {
@@ -371,13 +386,13 @@
   /* ---------- Abrir / nuevo / cargar ---------- */
   async function abrirArchivo() {
     const r = await K.abrir({ id: 'cv-maker-abrir' }); if (!r) return;
-    cargarArchivo(r.name, r.text, r.asa);
+    cargarArchivo(r.name, r.text, r.asa, r.lastModified);
   }
-  async function cargarArchivo(nombre, texto, asa) {
+  async function cargarArchivo(nombre, texto, asa, mod) {
     if (S.sucio && !(await K.confirmar('Cambios sin guardar', 'Si abres otro CV se perderán los cambios actuales. ¿Continuar?', 'Abrir', true))) return;
     try {
       const l = K.leerCVs(nombre, texto);
-      S.data = l[0]; S.asa = (asa && /\.html?$/i.test(nombre)) ? asa : null; S.nombreArchivo = nombre; S.sucio = false; S.guardadoEn = null;
+      S.data = l[0]; S.asa = (asa && /\.html?$/i.test(nombre)) ? asa : null; S.mod = S.asa ? (mod || null) : null; S.nombreArchivo = nombre; S.sucio = false; S.guardadoEn = null;
       S.modo = 'ver'; aplicarModo(); refrescarTodo();
       avisoFotoRuta();
       toast(l.length > 1 ? 'El archivo tenía ' + l.length + ' CVs; se ha abierto el primero.' : 'CV abierto: ' + (S.data.nombre || nombre), 'ok');
@@ -385,7 +400,7 @@
   }
   async function nuevoCV() {
     if (S.sucio && !(await K.confirmar('Cambios sin guardar', 'Se perderán los cambios actuales. ¿Crear un CV en blanco?', 'Crear en blanco', true))) return;
-    S.data = K.emptyCV(); S.asa = null; S.sucio = false; S.guardadoEn = null; S.nombreArchivo = ''; S.modo = 'editar'; aplicarModo(); refrescarTodo();
+    S.data = K.emptyCV(); S.asa = null; S.mod = null; S.sucio = false; S.guardadoEn = null; S.nombreArchivo = ''; S.modo = 'editar'; aplicarModo(); refrescarTodo();
   }
 
   /* ---------- Copilot: importar / traducir ---------- */
