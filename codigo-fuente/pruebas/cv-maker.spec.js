@@ -1,11 +1,11 @@
-// Comportamiento del CV Maker (HTML entregable). Ver docs/contrato-datos.md.
+// Comportamiento del CV Maker (HTML entregable). Ver contexto/contrato-datos.md.
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 
-const RAIZ = path.join(__dirname, '..');
-const HTML = path.resolve(RAIZ, process.env.CV_MAKER_HTML || 'dist/cv-maker.html');
+const RAIZ = path.join(__dirname, '..', '..'); // raíz del repositorio
+const HTML = path.resolve(RAIZ, process.env.CV_MAKER_HTML || 'entregable-final/cv-maker.html');
 const URL_HTML = pathToFileURL(HTML).href;
 const FIX = n => path.join(__dirname, 'fixtures', n);
 const hoy = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };

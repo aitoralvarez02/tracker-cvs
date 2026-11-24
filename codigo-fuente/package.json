@@ -3,8 +3,8 @@
   "private": true,
   "description": "CV Maker (editor de CV) y CV Hub (maqueta) de KPMG GRC",
   "scripts": {
-    "build": "node build/build.js",
-    "test": "node build/build.js && playwright test"
+    "build": "node build.js",
+    "test": "node build.js && playwright test"
   },
   "devDependencies": {
     "@playwright/test": "1.65.1"

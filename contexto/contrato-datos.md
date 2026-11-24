@@ -2,7 +2,7 @@
 
 Este contrato es compartido por el CV Maker, el CV Hub y HTML Maker. Un cambio que lo rompa deja CVs ya guardados sin poder abrirse en alguna de las tres herramientas. Por eso todo cambio debe ser **aditivo**.
 
-Código de referencia: `src/shared/core.js` (`emptyCV`, `normalize`, `clean`, `pick`, `leerCVs`, `urlOk`, `fotoOk`).
+Código de referencia: `codigo-fuente/src/shared/core.js` (`emptyCV`, `normalize`, `clean`, `pick`, `leerCVs`, `urlOk`, `fotoOk`).
 
 ## 1. El archivo de un CV
 

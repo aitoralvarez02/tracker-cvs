@@ -1,3 +1,4 @@
+# Se ignoran en cualquier carpeta (las dependencias y los resultados de los tests viven en codigo-fuente/)
 node_modules/
 test-results/
 playwright-report/
