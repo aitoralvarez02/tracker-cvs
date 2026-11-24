@@ -319,6 +319,8 @@
     if (!S.data.nombre.trim()) { toast('Escribe tu nombre antes de guardar.', 'error'); S.modo = 'editar'; aplicarModo(); S.abierto.persona = true; pintarPanel(); const n = $('[data-k="nombre"]'); if (n) n.focus(); return; }
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     S.data.meta.actualizado = K.hoy();
+    const malos = [['linkedin', 'LinkedIn'], ['tendencias', 'KPMG Tendencias']].filter(([k]) => S.data[k].trim() && !K.urlOk(S.data[k].trim()));
+    if (malos.length) { malos.forEach(([k]) => { S.data[k] = ''; }); pintarPanel(); S.ctl.pintar(S.data, S.lang); toast('El enlace de ' + malos.map(m => m[1]).join(' y ') + ' no es válido (debe empezar por https:// y no llevar espacios ni comillas): se ha quitado.', 'error'); }
     const nombre = nombreSugerido();
     const r = await K.guardar(nombre, buildHtml(), { key: 'cv-maker', id: 'cv-maker', asa: como ? null : S.asa });
     if (!r.ok) return;

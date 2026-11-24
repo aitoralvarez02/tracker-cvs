@@ -113,6 +113,28 @@ test('seguridad: no ejecuta HTML ajeno y filtra enlaces y fotos', async ({ page 
   for (const p of [page, p2]) expect(await p.evaluate(() => window.__pwned)).toBeUndefined();
 });
 
+test('seguridad: urlOk rechaza enlaces que podrían inyectar atributos en HTML Maker', async ({ page }) => {
+  await abrirEditor(page);
+  const r = await page.evaluate(() => [
+    'https://x"onmouseover=alert(1)', "https://x'onmouseover=1", 'https://x/<b>', 'https://x y', 'https://x\ty', 'javascript:alert(1)',
+    'https://', 'ftp://x.com', 'https://www.linkedin.com/in/ana-prueba', 'http://kpmg.es/tendencias?a=1&b=2'
+  ].map(u => CVK.urlOk(u)));
+  expect(r).toEqual([false, false, false, false, false, false, false, false, true, true]);
+  const cv = JSON.parse(fs.readFileSync(FIX('cv-completo.json'), 'utf8'));
+  cv.linkedin = 'https://x"onmouseover=window.__pwned=5 x="';
+  cv.tendencias = 'https://kpmg.es/tendencias/articulo';
+  const ruta = test.info().outputPath('enlace-malo.json');
+  fs.writeFileSync(ruta, JSON.stringify(cv));
+  await abrirCV(page, ruta);
+  await expect(page.locator('#cvbox .cv-link')).toHaveCount(1);
+  await expect(page.locator('#cvbox .cv-link')).toHaveAttribute('href', 'https://kpmg.es/tendencias/articulo');
+  const g = await guardar(page);
+  const d = datosDe(g.texto);
+  expect(d.linkedin).toBe('');
+  expect(d.tendencias).toBe('https://kpmg.es/tendencias/articulo');
+  await expect(page.locator('.toast--error')).toContainText('LinkedIn no es válido');
+});
+
 test('ajuste automático: texto largo pasa a 2 columnas y letra menor', async ({ page }) => {
   await abrirEditor(page);
   const largo = JSON.parse(fs.readFileSync(FIX('cv-completo.json'), 'utf8'));

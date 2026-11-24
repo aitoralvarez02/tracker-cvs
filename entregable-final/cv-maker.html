@@ -320,6 +320,8 @@ html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
     CAMPOS_EN.forEach(k => { if (vacio(en[k])) delete en[k]; });
     if (Object.keys(en).length) o.en = en; else delete o.en;
     ['nombre', 'cargo', 'empresa', 'parrafo_azul'].forEach(k => { o[k] = (o[k] || '').trim(); });
+    /* Un enlace no válido no se guarda: HTML Maker lo pintaría tal cual dentro de href. */
+    ['linkedin', 'tendencias'].forEach(k => { o[k] = (o[k] || '').trim(); if (o[k] && !urlOk(o[k])) o[k] = ''; });
     return o;
   }
   function pick(d, lang) {
@@ -329,7 +331,13 @@ html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
     return r;
   }
   const tieneEN = d => !!(d.en && (!vacio(d.en.parrafo_azul) || !vacio(d.en.cuerpo)));
-  const urlOk = u => /^https?:\/\/[^\s]+$/i.test(u || '');
+  /* Enlace http(s) seguro también para HTML Maker, que mete linkedin y tendencias en href="…" sin escapar:
+     se rechazan comillas, < y >, espacios y caracteres de control, y la URL debe ser válida para el navegador. */
+  function urlOk(u) {
+    const s = String(u || '');
+    if (!/^https?:\/\//i.test(s) || /["'`<>\s\u0000-\u001f\u007f]/.test(s)) return false;
+    try { const p = new URL(s); return (p.protocol === 'http:' || p.protocol === 'https:') && !!p.hostname; } catch (e) { return false; }
+  }
   const fotoOk = f => /^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(f || '');
   function vacioTotal(d) { return !d.nombre && !d.cargo && !d.parrafo_azul && !d.cuerpo.length && !d.formacion.length && !d.insights.length; }
 
@@ -991,6 +999,8 @@ html[data-tema="noche"] .bienv { background: rgba(6, 14, 30, .82); }
     if (!S.data.nombre.trim()) { toast('Escribe tu nombre antes de guardar.', 'error'); S.modo = 'editar'; aplicarModo(); S.abierto.persona = true; pintarPanel(); const n = $('[data-k="nombre"]'); if (n) n.focus(); return; }
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     S.data.meta.actualizado = K.hoy();
+    const malos = [['linkedin', 'LinkedIn'], ['tendencias', 'KPMG Tendencias']].filter(([k]) => S.data[k].trim() && !K.urlOk(S.data[k].trim()));
+    if (malos.length) { malos.forEach(([k]) => { S.data[k] = ''; }); pintarPanel(); S.ctl.pintar(S.data, S.lang); toast('El enlace de ' + malos.map(m => m[1]).join(' y ') + ' no es válido (debe empezar por https:// y no llevar espacios ni comillas): se ha quitado.', 'error'); }
     const nombre = nombreSugerido();
     const r = await K.guardar(nombre, buildHtml(), { key: 'cv-maker', id: 'cv-maker', asa: como ? null : S.asa });
     if (!r.ok) return;

@@ -79,6 +79,8 @@
     CAMPOS_EN.forEach(k => { if (vacio(en[k])) delete en[k]; });
     if (Object.keys(en).length) o.en = en; else delete o.en;
     ['nombre', 'cargo', 'empresa', 'parrafo_azul'].forEach(k => { o[k] = (o[k] || '').trim(); });
+    /* Un enlace no válido no se guarda: HTML Maker lo pintaría tal cual dentro de href. */
+    ['linkedin', 'tendencias'].forEach(k => { o[k] = (o[k] || '').trim(); if (o[k] && !urlOk(o[k])) o[k] = ''; });
     return o;
   }
   function pick(d, lang) {
@@ -88,7 +90,13 @@
     return r;
   }
   const tieneEN = d => !!(d.en && (!vacio(d.en.parrafo_azul) || !vacio(d.en.cuerpo)));
-  const urlOk = u => /^https?:\/\/[^\s]+$/i.test(u || '');
+  /* Enlace http(s) seguro también para HTML Maker, que mete linkedin y tendencias en href="…" sin escapar:
+     se rechazan comillas, < y >, espacios y caracteres de control, y la URL debe ser válida para el navegador. */
+  function urlOk(u) {
+    const s = String(u || '');
+    if (!/^https?:\/\//i.test(s) || /["'`<>\s\u0000-\u001f\u007f]/.test(s)) return false;
+    try { const p = new URL(s); return (p.protocol === 'http:' || p.protocol === 'https:') && !!p.hostname; } catch (e) { return false; }
+  }
   const fotoOk = f => /^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(f || '');
   function vacioTotal(d) { return !d.nombre && !d.cargo && !d.parrafo_azul && !d.cuerpo.length && !d.formacion.length && !d.insights.length; }
 

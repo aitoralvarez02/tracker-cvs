@@ -26,8 +26,8 @@ Es el mismo JSON que el de HTML Maker, con una clave opcional `meta` añadida.
 | `cargo` | texto | |
 | `empresa` | texto | Por defecto `KPMG España`. |
 | `foto` | texto | Solo vale `data:image/(jpeg\|png\|webp\|gif);base64,…`. Con cualquier otro valor se pinta la foto genérica. El editor recorta la foto a 276×324 en JPEG. |
-| `linkedin` | texto | Solo se pinta si es `http(s)://…`. |
-| `tendencias` | texto | Artículo en KPMG Tendencias. Solo se pinta si es `http(s)://…`. |
+| `linkedin` | texto | Solo se pinta si es un enlace `http(s)://…` válido (ver «Seguridad»). Si no lo es, se guarda vacío. |
+| `tendencias` | texto | Artículo en KPMG Tendencias. Mismas reglas que `linkedin`. |
 | `insights` | texto[] | De 3 a 4 frases de resumen. No salen en el lienzo del CV, solo en el visor. |
 | `formacion` | texto[] | Columna izquierda del CV. |
 | `parrafo_azul` | texto | Presentación en azul. Los párrafos se separan con una línea en blanco. El primero va en negrita. Un párrafo que empieza por `- ` se pinta como viñeta. |
@@ -71,13 +71,14 @@ Las listas sugeridas son provisionales y están en `CATEGORIAS`, `OFICINAS` y `A
 
 - Se recortan los espacios de `nombre`, `cargo`, `empresa` y `parrafo_azul`.
 - Se quitan los elementos vacíos de las listas y los bloques vacíos de `cuerpo`.
+- `linkedin` y `tendencias` que no sean un enlace válido se guardan vacíos, y el editor avisa.
 - **Los campos EN vacíos se eliminan**. Si `en` se queda sin campos, también se elimina. Así HTML Maker no sustituye el texto español por un texto vacío.
 
 ## 5. Seguridad
 
 - Un CV ajeno se lee solo con `DOMParser`, que no ejecuta scripts, y de él solo se extrae `#cv-data`. Nunca se ejecuta su HTML.
 - Todo el texto se escapa antes de pintarse. La única marca que se interpreta es `**negrita**`.
-- Solo se pintan los enlaces `http(s)` y las fotos `data:image/…;base64`.
+- Solo se pintan las fotos `data:image/…;base64` y los enlaces que pasan `urlOk`: empiezan por `http://` o `https://`, `new URL` los acepta con un host, y no llevan comillas (`"`, `'`, `` ` ``), `<`, `>`, espacios ni caracteres de control. Hace falta porque HTML Maker escribe `linkedin` y `tendencias` dentro de `href="…"` sin escapar.
 
 ## 6. Render
 
